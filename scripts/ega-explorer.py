@@ -482,8 +482,8 @@ class Handler(BaseHTTPRequestHandler):
   </div>
   <div class="stat">
     <div class="l">Next halving</div>
-    <div class="v" style="font-size:1.05rem">#{esc(snap['next_halving_height']):,}</div>
-    <div class="s">{esc(snap['blocks_to_halving']):,} blocks left</div>
+    <div class="v" style="font-size:1.05rem">#{esc(f"{snap['next_halving_height']:,}")}</div>
+    <div class="s">{esc(f"{snap['blocks_to_halving']:,}")} blocks left</div>
   </div>
   <div class="stat">
     <div class="l">Est. total hashrate</div>
