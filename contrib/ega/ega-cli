@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+DIR="${EGA_BIN_DIR:-$(cd "$(dirname "$0")/../../src" 2>/dev/null && pwd || true)}"
+if [[ -n "${DIR}" && -x "${DIR}/ega-cli" ]]; then exec "${DIR}/ega-cli" "$@"; fi
+if [[ -n "${DIR}" && -x "${DIR}/digibyte-cli" ]]; then exec "${DIR}/digibyte-cli" "$@"; fi
+exec digibyte-cli "$@"

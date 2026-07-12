@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# EGA daemon — prefers built egad, falls back to digibyted.
+set -euo pipefail
+DIR="${EGA_BIN_DIR:-$(cd "$(dirname "$0")/../../src" 2>/dev/null && pwd || true)}"
+if [[ -n "${DIR}" && -x "${DIR}/egad" ]]; then exec "${DIR}/egad" "$@"; fi
+if [[ -n "${DIR}" && -x "${DIR}/digibyted" ]]; then exec "${DIR}/digibyted" "$@"; fi
+if command -v egad >/dev/null 2>&1 && [[ "$(command -v egad)" != "$0" ]]; then exec egad "$@"; fi
+exec digibyted "$@"
