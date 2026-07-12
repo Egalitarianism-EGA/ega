@@ -112,10 +112,10 @@ DONE:
   [x] Explorer with per-algo difficulty/hashrate/rewards
   [x] Miningcore Verthash pool online (this PC)
   [x] Website + all org hub docs MultiShield-4
-  [x] Prebuilt release v0.1.0 (may predate Scrypt — rebuild for new binary)
+  [x] Prebuilt release v0.2.0 (MultiShield-4 Linux x86_64)
 
 NOT DONE / NEXT:
-  [ ] New GitHub Release binary after MultiShield-4
+  [x] New GitHub Release binary after MultiShield-4 (v0.2.0)
   [ ] 24/7 public seed IP / addnode list
   [ ] Public explorer URL (tunnel)
   [ ] Miningcore RandomX/Yespower/Scrypt full share-verify (or stock scrypt pool profile live)
