@@ -192,19 +192,18 @@ class StratumClient(threading.Thread):
             log_event("auth", self.worker, f"from {self.addr[0]}")
             self.send({"id": mid, "result": True, "error": None})
         elif method == "mining.submit":
-            # Early network: attempt pool-side mine to worker address (CPU path)
-            # Real share verification requires Miningcore-class PoW checks.
+            # Honest: only accept when the node actually found a block for the worker.
+            # No fake share acks — real PoW share-verify needs Miningcore-class checks.
             worker = str(params[0]) if params else self.worker
             self.worker = worker
-            log_event("share", worker, "submit")
-            # Try generate one block to their address if node is free
+            log_event("submit", worker, "mining.submit")
             res = mine_one_for(worker)
             if res.get("ok"):
                 self.send({"id": mid, "result": True, "error": None})
             else:
-                # still ack share for UX on test nets; detail error
-                self.send({"id": mid, "result": True, "error": None})
-                log_event("share", worker, f"noted: {res.get('error')}")
+                err = res.get("error") or "no block"
+                self.send({"id": mid, "result": None, "error": [21, f"rejected: {err}", None]})
+                log_event("reject", worker, str(err))
         elif method == "mining.extranonce.subscribe":
             self.send({"id": mid, "result": True, "error": None})
         else:
@@ -293,9 +292,10 @@ a {{ color:var(--accent); }}
   <div class="card"><div class="n">{uptime}s</div><div class="l">Uptime</div></div>
 </div>
 <div class="note">
-  <b>Connect miners:</b> <code>stratum+tcp://HOST:{STRATUM_PORT}</code><br/>
-  Username = your EGA address · password = <code>x</code><br/>
-  Early network: pool can also mine a block to your address from the form below (CPU RandomX on the pool host).
+  <b>Local early pool — not a public Herominers-style service.</b><br/>
+  Stratum: <code>stratum+tcp://HOST:{STRATUM_PORT}</code> · username = EGA address · password = <code>x</code><br/>
+  Share counts only rise when a real block is found (CPU path on this host). Unverified partial shares are <b>not</b> counted as accepted work.
+  Prefer Miningcore Verthash (<code>scripts/start-miningcore.sh</code> :3334) for real share verify.
 </div>
 <h2>Mine one block to address (pool host CPU)</h2>
 <form method="POST" action="/mine">

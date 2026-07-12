@@ -153,14 +153,28 @@ def fmt_ega(n: float) -> str:
 
 
 def hashrate_from_diff(difficulty: float, target_seconds: float = ALGO_TARGET_SPACING) -> float:
-    """Bitcoin-family estimate: H/s ≈ difficulty * 2^32 / target_block_time."""
+    """Theoretical H/s if difficulty alone secured `target_seconds` spacing (not measured work)."""
     if difficulty is None or difficulty <= 0 or target_seconds <= 0:
         return 0.0
     return float(difficulty) * (2**32) / float(target_seconds)
 
 
+def hashrate_from_block_times(times: list, difficulty: float) -> float | None:
+    """Measured-ish H/s from actual inter-block times for one algo (needs ≥2 timestamps)."""
+    if difficulty is None or difficulty <= 0 or len(times) < 2:
+        return None
+    span = max(times) - min(times)
+    if span <= 0:
+        return None
+    # n blocks ⇒ n-1 intervals over `span` seconds
+    avg_spacing = span / (len(times) - 1)
+    if avg_spacing <= 0:
+        return None
+    return float(difficulty) * (2**32) / float(avg_spacing)
+
+
 def collect_algo_stats(height: int, window: int = 120):
-    """Count recent blocks per algo and estimate spacing-based hashrate."""
+    """Count recent blocks per algo and collect timestamps."""
     counts = {a: 0 for a in ALGOS}
     times = {a: [] for a in ALGOS}
     start = max(1, height - window + 1)  # skip genesis
@@ -182,7 +196,6 @@ def network_snapshot():
     info = rpc("getblockchaininfo")
     height = int(info.get("blocks", 0))
     diffs = info.get("difficulties") or {}
-    # normalize keys
     diff_map = {}
     for k, v in diffs.items():
         diff_map[k.lower()] = float(v)
@@ -194,25 +207,47 @@ def network_snapshot():
         key = f"difficulty_{a}"
         if a not in diff_map and key in mining:
             diff_map[a] = float(mining[key])
+
+    # Real node estimate from recent work (overall chain), not min-diff theatre
     try:
-        net_hps = float(rpc("getnetworkhashps", [min(120, max(1, height)), -1]))
+        n_blocks = min(120, max(1, height))
+        net_hps = float(rpc("getnetworkhashps", [n_blocks, -1]))
     except Exception:
         net_hps = 0.0
 
-    counts, _ = collect_algo_stats(height, window=min(120, max(1, height)))
-    total_counted = sum(counts.values()) or 1
+    try:
+        netinfo = rpc("getnetworkinfo")
+        peers = int(netinfo.get("connections", 0))
+    except Exception:
+        peers = 0
+
+    window = min(120, max(0, height))
+    counts, times = collect_algo_stats(height, window=window) if height > 0 else ({a: 0 for a in ALGOS}, {a: [] for a in ALGOS})
+    total_counted = sum(counts.values())
+    # Share % only meaningful with a real sample; still report raw counts always
+    share_reliable = total_counted >= 20
 
     algos = []
+    measured_sum = 0.0
+    measured_any = False
     for a in ALGOS:
-        d = diff_map.get(a, 0.0)
-        hps = hashrate_from_diff(d, ALGO_TARGET_SPACING)
-        share = 100.0 * counts.get(a, 0) / total_counted
+        d = float(diff_map.get(a, 0.0) or 0.0)
+        n = int(counts.get(a, 0))
+        measured = hashrate_from_block_times(times.get(a) or [], d)
+        theoretical = hashrate_from_diff(d, ALGO_TARGET_SPACING) if d > 0 else 0.0
+        if measured is not None:
+            measured_sum += measured
+            measured_any = True
+        share = (100.0 * n / total_counted) if total_counted > 0 else None
         algos.append(
             {
                 "algo": a,
                 "difficulty": d,
-                "hashrate": hps,
-                "blocks_window": counts.get(a, 0),
+                # Prefer measured; null when we cannot honestly estimate
+                "hashrate": measured,
+                "hashrate_theoretical": theoretical,
+                "hashrate_source": "block_times" if measured is not None else ("none" if d <= 0 else "insufficient_blocks"),
+                "blocks_window": n,
                 "share_pct": share,
             }
         )
@@ -220,6 +255,7 @@ def network_snapshot():
     reward = subsidy_at(height)
     next_halving = ((height // HALVING_INTERVAL) + 1) * HALVING_INTERVAL
     blocks_to_halving = max(0, next_halving - height)
+    early = height < 100 or peers == 0
 
     return {
         "info": info,
@@ -228,7 +264,11 @@ def network_snapshot():
         "best": info.get("bestblockhash"),
         "algos": algos,
         "network_hashps_rpc": net_hps,
-        "network_hashps_sum": sum(x["hashrate"] for x in algos),
+        "network_hashps_measured_sum": measured_sum if measured_any else None,
+        "peers": peers,
+        "window_blocks": total_counted,
+        "share_reliable": share_reliable,
+        "early_network": early,
         "reward": reward,
         "next_halving_height": next_halving,
         "blocks_to_halving": blocks_to_halving,
@@ -382,21 +422,30 @@ class Handler(BaseHTTPRequestHandler):
         q = parse_qs(u.query)
         if path == "/api/stats":
             snap = network_snapshot()
-            # JSON-serializable
             self.send_json(
                 200,
                 {
                     "height": snap["height"],
                     "chain": snap["chain"],
                     "bestblockhash": snap["best"],
+                    "peers": snap["peers"],
+                    "early_network": snap["early_network"],
                     "block_reward_ega": snap["reward"],
                     "next_halving_height": snap["next_halving_height"],
                     "blocks_to_halving": snap["blocks_to_halving"],
                     "max_supply_ega": snap["max_supply"],
                     "target_block_time_sec": snap["block_time"],
+                    # Measured from recent blocks via node RPC (overall)
+                    "network_hashps": snap["network_hashps_rpc"],
                     "network_hashps_rpc": snap["network_hashps_rpc"],
-                    "network_hashps_sum_est": snap["network_hashps_sum"],
+                    "network_hashps_measured_sum": snap["network_hashps_measured_sum"],
+                    "window_blocks": snap["window_blocks"],
+                    "share_reliable": snap["share_reliable"],
                     "algorithms": snap["algos"],
+                    "notes": {
+                        "hashrate": "network_hashps is getnetworkhashps over recent blocks. Per-algo hashrate is only set when ≥2 blocks of that algo exist in the window (from timestamps); otherwise null — not a min-difficulty fiction.",
+                        "share_pct": "null share fields mean no blocks; percentages on a tiny window are noisy until share_reliable is true (≥20 blocks).",
+                    },
                 },
             )
             return
@@ -422,30 +471,40 @@ class Handler(BaseHTTPRequestHandler):
         snap = network_snapshot()
         height = snap["height"]
         reward = snap["reward"]
+        window = snap["window_blocks"]
 
-        # algo table rows
         colors = {"randomx": "var(--rx)", "verthash": "var(--vh)", "yespower-ega": "var(--yp)", "scrypt": "var(--sc)"}
         algo_rows = []
         for a in snap["algos"]:
             name = a["algo"]
             col = colors.get(name, "var(--accent)")
             pct = a["share_pct"]
+            if a["hashrate"] is not None:
+                hr_cell = f"<strong>{esc(fmt_hashrate(a['hashrate']))}</strong>"
+                hr_note = "from block times"
+            else:
+                hr_cell = '<span class="muted">—</span>'
+                hr_note = "need ≥2 blocks"
+            if pct is None:
+                share_cell = '<span class="muted">—</span>'
+            else:
+                bar_w = pct if snap["share_reliable"] else min(pct, 100.0)
+                label = f"{pct:.0f}%" if snap["share_reliable"] else f"{pct:.0f}%*"
+                share_cell = f"""
+                  <div style="display:flex;align-items:center;gap:.6rem">
+                    <div class="bar" style="flex:1"><i style="width:{bar_w:.1f}%;background:{col};opacity:{'1' if snap['share_reliable'] else '0.55'}"></i></div>
+                    <span class="muted" style="min-width:3.2rem">{label}</span>
+                  </div>"""
             algo_rows.append(
                 f"""<tr>
                 <td>{algo_badge(name)}</td>
                 <td class="right mono">{esc(fmt_diff(a['difficulty']))}</td>
-                <td class="right mono"><strong>{esc(fmt_hashrate(a['hashrate']))}</strong></td>
+                <td class="right mono">{hr_cell}<div class="s" style="font-size:.72rem">{hr_note}</div></td>
                 <td class="right">{a['blocks_window']}</td>
-                <td>
-                  <div style="display:flex;align-items:center;gap:.6rem">
-                    <div class="bar" style="flex:1"><i style="width:{pct:.1f}%;background:{col}"></i></div>
-                    <span class="muted" style="min-width:3.2rem">{pct:.0f}%</span>
-                  </div>
-                </td>
+                <td>{share_cell}</td>
                 </tr>"""
             )
 
-        # recent blocks
         rows = []
         for h in range(height, max(-1, height - 29), -1):
             try:
@@ -468,15 +527,28 @@ class Handler(BaseHTTPRequestHandler):
                 </tr>"""
             )
 
+        early_banner = ""
+        if snap["early_network"]:
+            early_banner = f"""
+<div class="note">
+  <strong>Early / local chain.</strong>
+  Height {esc(height)} · <strong>{esc(snap['peers'])} peers</strong>.
+  Difficulty is still near the fair-launch floor, so identical tiny difficulties across algos are normal — not four separate “live networks.”
+  Hashrate below is from <span class="mono">getnetworkhashps</span> on real blocks, not a made-up min-diff formula.
+  Algo share % with few blocks is noisy{'' if snap['share_reliable'] else ' (* = sample &lt; 20 blocks)'}.
+</div>"""
+
         return f"""
 <h1>Network overview</h1>
-<p class="muted">Live chain data from your node · MultiShield-4 PoW</p>
+<p class="muted">Data from <strong>your</strong> local node RPC · MultiShield-4 · not a third-party feed</p>
+
+{early_banner}
 
 <div class="stats">
   <div class="stat">
     <div class="l">Height</div>
     <div class="v">{esc(height)}</div>
-    <div class="s">{esc(snap['chain'])} · headers {esc(snap['info'].get('headers',''))}</div>
+    <div class="s">{esc(snap['chain'])} · {esc(snap['peers'])} peers</div>
   </div>
   <div class="stat">
     <div class="l">Block reward</div>
@@ -489,9 +561,9 @@ class Handler(BaseHTTPRequestHandler):
     <div class="s">{esc(f"{snap['blocks_to_halving']:,}")} blocks left</div>
   </div>
   <div class="stat">
-    <div class="l">Est. total hashrate</div>
-    <div class="v" style="font-size:1.05rem">{esc(fmt_hashrate(snap['network_hashps_sum']))}</div>
-    <div class="s">RPC blend {esc(fmt_hashrate(snap['network_hashps_rpc']))}</div>
+    <div class="l">Network hashrate</div>
+    <div class="v" style="font-size:1.05rem">{esc(fmt_hashrate(snap['network_hashps_rpc']))}</div>
+    <div class="s">getnetworkhashps · last {esc(min(120, max(1, height)))} blocks</div>
   </div>
 </div>
 
@@ -500,27 +572,28 @@ class Handler(BaseHTTPRequestHandler):
 <div class="card" id="algos">
   <div class="card-h">
     <h2>Algorithms</h2>
-    <span class="muted">difficulty · estimated hashrate · last ~120 blocks</span>
+    <span class="muted">live difficulty · measured hashrate only · last {esc(window)} blocks</span>
   </div>
   <table>
     <tr>
       <th>Algo</th>
       <th class="right">Difficulty</th>
-      <th class="right">Network hashrate</th>
+      <th class="right">Hashrate</th>
       <th class="right">Blocks</th>
-      <th>Share</th>
+      <th>Share of window</th>
     </tr>
     {''.join(algo_rows)}
   </table>
   <div style="padding:.75rem 1rem;border-top:1px solid var(--line)" class="muted">
-    Hashrate estimate: <span class="mono">difficulty × 2³² / {ALGO_TARGET_SPACING}s</span>
-    (MultiShield target spacing per algo). Block time target ~{BLOCK_TIME}s overall.
-    Max supply {MAX_SUPPLY:,} EGA · subsidy starts at {INITIAL_SUBSIDY:,} EGA.
+    <strong>What is real:</strong> height, block list, per-algo difficulty from the node, block rewards, peer count.
+    <strong>What is estimated:</strong> hashrate (from actual block times when enough samples exist; overall from <span class="mono">getnetworkhashps</span>).
+    We no longer show “network hashrate” from min difficulty alone — that always printed the same fake ~17 H/s per algo at launch.
+    Target spacing ~{BLOCK_TIME}s overall / ~{ALGO_TARGET_SPACING}s per algo. Max supply {MAX_SUPPLY:,} EGA.
   </div>
 </div>
 
 <div class="card" id="blocks">
-  <div class="card-h"><h2>Recent blocks</h2><span class="muted">latest 30</span></div>
+  <div class="card-h"><h2>Recent blocks</h2><span class="muted">latest 30 · from chain</span></div>
   <table>
     <tr>
       <th>Height</th><th>Hash</th><th>Algo</th>
@@ -579,7 +652,6 @@ class Handler(BaseHTTPRequestHandler):
             ("Algorithm", algo),
             ("Block reward", reward_line),
             ("Difficulty", fmt_diff(b.get("difficulty"))),
-            ("Est. algo hashrate", fmt_hashrate(hashrate_from_diff(float(b.get("difficulty") or 0)))),
             ("Nonce", b.get("nonce")),
             ("Bits", b.get("bits")),
             ("Size", f"{b.get('size', '—')} bytes"),
