@@ -136,3 +136,4 @@ src/crypto/randomx/build/
 .env
 *.pem
 *github_pat*
+configure~
