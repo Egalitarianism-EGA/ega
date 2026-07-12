@@ -105,8 +105,22 @@ bash scripts/two-node-mining-demo.sh
 
 ### Pool (shared rewards)
 
-Optional later. Configs: https://github.com/Egalitarianism-EGA/ega-miningcore  
-Not required for a live multi-miner network.
+```bash
+bash scripts/start-pool-stack.sh
+```
+
+Postgres + example Miningcore config under `~/.ega/pool-stack/`.  
+Details: https://github.com/Egalitarianism-EGA/ega-miningcore  
+
+Not required for multi-node solo mining.
+
+### Explorer (local)
+
+```bash
+# ~/.ega/ega.conf should include: txindex=1
+bash scripts/ega-explorer.sh
+# open http://127.0.0.1:8088
+```
 
 ---
 
