@@ -48,15 +48,16 @@ EGA is a privacy-respecting, egalitarian Proof-of-Work chain for people who are 
 
 ---
 
-## 3. Proof-of-Work: three algorithms from genesis
+## 3. Proof-of-Work: four algorithms from genesis (MultiShield-4)
 
-No temporary single-algo mainnet. All three are active from height 0.
+No temporary single-algo mainnet. All four are active from height 0.
 
 | ID | Algorithm | Primary hardware | Role |
 |----|-----------|------------------|------|
-| 0 | **RandomX** | Modern CPUs, phones/PCs/Pis with enough RAM (~2 GB class for full mode) | Main CPU path |
-| 1 | **Verthash** | Consumer GPUs | GPU path |
-| 2 | **YespowerEGA** | Old phones, low-RAM Pis, weak CPUs | Ultra-low-end CPU path |
+| 0 | **RandomX** | Modern CPUs / laptops | People CPU |
+| 1 | **Verthash** | Consumer GPUs | People GPU |
+| 2 | **YespowerEGA** | Phones, low-RAM Pis, weak CPUs | Inclusion |
+| 3 | **Scrypt** | ASIC / capital market | Security hard door (~25% share) |
 
 ### 3.1 YespowerEGA (custom Yespower instance)
 
@@ -69,8 +70,8 @@ No temporary single-algo mainnet. All three are active from height 0.
 
 ### 3.2 Block version / algo selection
 
-- Extend/replace DigiByte multi-algo version bits so only these three map to valid algos.
-- Unknown or legacy DigiByte algos (scrypt, sha256d, groestl, skein, qubit, odo, …) are **inactive** on EGA mainnet from genesis.
+- Extend DigiByte multi-algo version bits for these four active algos.
+- Other legacy DigiByte algos (sha256d, groestl, skein, qubit, odo as standalone mainnet set, …) stay inactive unless re-added by upgrade.
 
 ### 3.3 Integration notes (Phase 3)
 
@@ -94,8 +95,9 @@ DigiByte already implements multi-algo difficulty in `src/pow.cpp` (V1–V4). EG
 | Constant | Intent |
 |----------|--------|
 | `nPowTargetSpacing` / chain target | **60** seconds (overall) |
-| `NUM_ALGOS` | **3** |
-| Per-algo MultiShield spacing | **~180** seconds (3 × 60) |
+| `NUM_ALGOS` | **4** |
+| Per-algo MultiShield spacing | **~240** seconds (4 × 60) |
+| Target share | **~25%** per algo |
 | `nAveragingInterval` | Start from DigiByte-like **10** unless testing shows need to change |
 
 Legacy V1/V2-only paths should not gate mainnet once simplified; regtest/testnet may allow min-difficulty rules as today.

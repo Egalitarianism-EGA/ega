@@ -1,11 +1,12 @@
 // Copyright (c) 2026 The EGA Core developers
 // Distributed under the MIT software license.
 //
-// EGA triple PoW: RandomX + Verthash + YespowerEGA
+// EGA MultiShield-4 PoW: RandomX + Verthash + YespowerEGA + Scrypt
 
 #include <crypto/ega_pow.h>
 
 #include <crypto/sha256.h>
+#include <crypto/scrypt.h>
 #include <hash.h>
 #include <primitives/block.h>
 #include <serialize.h>
@@ -156,6 +157,20 @@ void EgaVerthashHash(const unsigned char* input, size_t input_len, uint256& outp
     memcpy(output.begin(), out, 32);
 }
 
+// ---- Scrypt (Litecoin/DigiByte scrypt_1024_1_1_256) ----
+// Classic multi-algo hard door: ASIC capital market, different from CPU/GPU people doors.
+void EgaScryptHash(const unsigned char* input, size_t input_len, uint256& output)
+{
+    // scrypt_1024_1_1_256 expects an 80-byte Bitcoin-family header.
+    char in[80];
+    char out[32];
+    memset(in, 0, sizeof(in));
+    size_t n = std::min(input_len, sizeof(in));
+    memcpy(in, input, n);
+    scrypt_1024_1_1_256(in, out);
+    memcpy(output.begin(), out, 32);
+}
+
 // ---- Dispatch ----
 static void SerializeHeader(const CBlockHeader& header, std::vector<unsigned char>& out)
 {
@@ -180,6 +195,9 @@ uint256 EgaGetPoWHash(const CBlockHeader& header, const Consensus::Params& param
         return result;
     case ALGO_YESPOWER_EGA:
         EgaYespowerHash(data.data(), data.size(), result);
+        return result;
+    case ALGO_SCRYPT:
+        EgaScryptHash(data.data(), data.size(), result);
         return result;
     default:
         return ArithToUint256(~arith_uint256(0));

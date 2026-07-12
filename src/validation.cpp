@@ -1726,8 +1726,8 @@ bool IsAlgoActive(const CBlockIndex* pindexPrev, const Consensus::Params& consen
 {
     (void)pindexPrev;
     (void)consensus;
-    // EGA: From genesis, RandomX + Verthash + YespowerEGA.
-    return algo == ALGO_RANDOMX || algo == ALGO_VERTHASH || algo == ALGO_YESPOWER_EGA;
+    // EGA MultiShield-4 from genesis: RandomX + Verthash + YespowerEGA + Scrypt.
+    return algo == ALGO_RANDOMX || algo == ALGO_VERTHASH || algo == ALGO_YESPOWER_EGA || algo == ALGO_SCRYPT;
 }
 
 /**

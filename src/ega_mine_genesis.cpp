@@ -107,9 +107,9 @@ int main(int argc, char** argv)
     const char* ts_main =
         "EGA fair launch: equality of opportunity, not outcome — anyone may mine.";
     const char* ts_test =
-        "EGA testnet: RandomX + Verthash + YespowerEGA MultiShield";
+        "EGA testnet: MultiShield-4 RandomX Verthash YespowerEGA Scrypt";
     const char* ts_reg =
-        "EGA regtest";
+        "EGA regtest MultiShield-4";
 
     // Fixed times (UTC) for reproducibility
     const uint32_t t_main = 1751846400; // 2025-07-07 00:00:00 UTC (near project start)

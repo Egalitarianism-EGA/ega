@@ -22,8 +22,8 @@ Privacy-respecting, egalitarian **Proof-of-Work** full node — forked from Digi
 | Block subsidy | **50,000** EGA, halvings every **210,000** blocks |
 | Block time | **60 seconds** (overall) |
 | Premine | **0** |
-| PoW | **RandomX** + **Verthash** + **YespowerEGA** (from genesis) |
-| Difficulty | **MultiShield** (V4-style) from height 0 |
+| PoW | **RandomX** + **Verthash** + **YespowerEGA** + **Scrypt** (MultiShield-4) |
+| Difficulty | **MultiShield** (V4-style) from height 0 · ~25% share each |
 | Main P2P / RPC | **20201** / **20202** |
 | Magic | `e4 47 41 01` (main) |
 | bech32 HRP | `ega` |
@@ -36,11 +36,12 @@ Full tables: [`docs/ega/params.md`](docs/ega/params.md) · design: [`docs/ega/de
 
 | Algo | Best for |
 |------|----------|
-| **RandomX** | Modern CPUs, phones, Pi with enough RAM |
+| **RandomX** | Modern CPUs / laptops |
 | **Verthash** | Consumer GPUs (EGA 256 MiB dataset) |
 | **YespowerEGA** | Old phones, low-RAM Pi (`N=2048`, `r=32`, personalization `YespowerEGA`) |
+| **Scrypt** | Harder door (ASIC / capital market) — MultiShield security anchor |
 
-MultiShield keeps independent difficulty per algo (~⅓ share each).
+MultiShield keeps independent difficulty per algo (~**¼** share each). Same block reward no matter which algo wins.
 
 ---
 

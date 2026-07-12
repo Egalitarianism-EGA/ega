@@ -10,7 +10,7 @@ Last updated: 2026-07-12
 ================================================================================
 - Fair-launch multi-algo PoW cryptocurrency (fork of DigiByte/Bitcoin Core).
 - Anyone can mine: CPU, GPU, phone/Pi — no premine.
-- Algorithms from genesis: RandomX + Verthash + YespowerEGA (MultiShield).
+- Algorithms from genesis: RandomX + Verthash + YespowerEGA + Scrypt (MultiShield-4) (MultiShield).
 - Block ~60s, subsidy 50,000 EGA, halve every 210,000 blocks, max 21B EGA, 8 decimals.
 
 ================================================================================
@@ -57,6 +57,8 @@ Genesis regtest: 7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac
 Genesis test:    86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98
 
 YespowerEGA: N=2048 r=32 pers="YespowerEGA" YESPOWER_1_0
+Scrypt: scrypt_1024_1_1_256 (hard door)
+MultiShield share: ~25% each; spacing 240s per algo
 Verthash dataset: tag EGA-Verthash-v1 size 256 MiB (NOT Vertcoin official dat)
 RandomX: light VM; seed tag EGA-RandomX; epoch nTime/(2048*60)
 

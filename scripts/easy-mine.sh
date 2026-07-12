@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Mine N blocks with one algo. Usage: easy-mine.sh [algo] [blocks]
-# algo: randomx | yespower-ega | verthash
+# algo: randomx | yespower-ega | verthash | scrypt
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLI="${EGA_CLI:-$ROOT/src/ega-cli}"
@@ -11,6 +11,7 @@ TRIES="${3:-10000000}"
 case "$ALGO" in
   randomx|rx) ALGO=randomx ;;
   yespower-ega|yespower|yp|yespowerega) ALGO=yespower-ega ;;
+  scrypt) ALGO=scrypt ;;
   verthash|vert|vtc)
     echo "NOTE: 'verthash' here uses the NODE (CPU path)."
     echo "For REAL GPU mining, use: https://github.com/Egalitarianism-EGA/ega-verthash-miner"
@@ -19,7 +20,7 @@ case "$ALGO" in
     ;;
   *)
     echo "Unknown algo: $ALGO"
-    echo "Use: randomx | yespower-ega | verthash"
+    echo "Use: randomx | yespower-ega | verthash | scrypt"
     exit 1
     ;;
 esac

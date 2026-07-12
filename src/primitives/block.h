@@ -14,16 +14,17 @@
 
 namespace Consensus { struct Params; }
 
-/** EGA triple PoW — see docs/ega/design.md */
+/** EGA MultiShield-4 PoW — see docs/ega/design.md */
 enum {
     ALGO_UNKNOWN = -1,
-    ALGO_RANDOMX      = 0,   // modern CPU / phone / Pi with enough RAM
+    ALGO_RANDOMX      = 0,   // modern CPU / laptop
     ALGO_VERTHASH     = 1,   // consumer GPU
-    ALGO_YESPOWER_EGA = 2,   // old phones, low-RAM Pi (YespowerEGA)
+    ALGO_YESPOWER_EGA = 2,   // phone / Pi / weak CPU
+    ALGO_SCRYPT       = 3,   // hard door (ASIC / capital market; MultiShield security anchor)
     NUM_ALGOS_IMPL
 };
 
-#define NUM_ALGOS (NUM_ALGOS_IMPL)  // 3 algos (UNKNOWN is -1, not counted in IMPL end)
+#define NUM_ALGOS (NUM_ALGOS_IMPL)  // 4 algos (~25% MultiShield share each)
 
 enum {
     BLOCK_VERSION_DEFAULT        = 2,
@@ -31,6 +32,7 @@ enum {
     // Algo field in nVersion bits 8-11 (DigiByte multi-algo layout)
     BLOCK_VERSION_ALGO           = (15 << 8),
     BLOCK_VERSION_RANDOMX        = (0 << 8),
+    BLOCK_VERSION_SCRYPT         = (1 << 8),
     BLOCK_VERSION_VERTHASH       = (2 << 8),
     BLOCK_VERSION_YESPOWER_EGA   = (4 << 8),
 };
@@ -49,6 +51,8 @@ inline int GetVersionForAlgo(int algo)
             return BLOCK_VERSION_VERTHASH;
         case ALGO_YESPOWER_EGA:
             return BLOCK_VERSION_YESPOWER_EGA;
+        case ALGO_SCRYPT:
+            return BLOCK_VERSION_SCRYPT;
         default:
             assert(false);
             return 0;

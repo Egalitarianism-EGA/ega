@@ -20,15 +20,17 @@ echo ""
 echo "Egalitarianism Miner"
 echo "--------------------"
 echo "1) RandomX     (CPU — modern processors)"
-echo "2) YespowerEGA (CPU — also fine on weaker machines)"
-echo "3) Verthash    (GPU — opens instructions)"
-echo "4) Quit"
+echo "2) YespowerEGA (CPU — weaker machines / phones / Pi)"
+echo "3) Scrypt      (harder door — MultiShield security anchor)"
+echo "4) Verthash    (GPU — opens instructions)"
+echo "5) Quit"
 echo ""
-read -r -p "Choose [1-4]: " c
+read -r -p "Choose [1-5]: " c
 case "$c" in
   1) bash "$ROOT/scripts/easy-mine.sh" randomx 1 ;;
   2) bash "$ROOT/scripts/easy-mine.sh" yespower-ega 1 ;;
-  3)
+  3) bash "$ROOT/scripts/easy-mine.sh" scrypt 1 ;;
+  4)
     echo ""
     echo "GPU Verthash uses a separate miner against your node."
     echo "Guide: https://github.com/Egalitarianism-EGA/ega-verthash-miner"

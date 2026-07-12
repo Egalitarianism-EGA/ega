@@ -26,6 +26,8 @@ int CBlockHeader::GetAlgo() const
     {
         case BLOCK_VERSION_RANDOMX:
             return ALGO_RANDOMX;
+        case BLOCK_VERSION_SCRYPT:
+            return ALGO_SCRYPT;
         case BLOCK_VERSION_VERTHASH:
             return ALGO_VERTHASH;
         case BLOCK_VERSION_YESPOWER_EGA:
@@ -74,6 +76,8 @@ std::string GetAlgoName(int Algo)
             return std::string("verthash");
         case ALGO_YESPOWER_EGA:
             return std::string("yespower-ega");
+        case ALGO_SCRYPT:
+            return std::string("scrypt");
         default:
             return std::string("unknown");
     }
@@ -88,6 +92,8 @@ int GetAlgoByName(std::string strAlgo, int fallback)
         return ALGO_VERTHASH;
     else if (strAlgo == "yespower-ega" || strAlgo == "yespower" || strAlgo == "yp" || strAlgo == "yespowerega")
         return ALGO_YESPOWER_EGA;
+    else if (strAlgo == "scrypt")
+        return ALGO_SCRYPT;
     else
         return fallback;
 }

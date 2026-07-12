@@ -23,4 +23,7 @@ void EgaRandomXHash(const unsigned char* input, size_t input_len, uint32_t nTime
 /** Verthash with EGA-personalized in-memory dataset (see docs/ega/params.md). */
 void EgaVerthashHash(const unsigned char* input, size_t input_len, uint256& output);
 
+/** Scrypt (N=1024,r=1,p=1) — DigiByte/Litecoin-compatible; MultiShield security anchor. */
+void EgaScryptHash(const unsigned char* input, size_t input_len, uint256& output);
+
 #endif // EGA_POW_H

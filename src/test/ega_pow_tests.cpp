@@ -17,21 +17,24 @@ BOOST_FIXTURE_TEST_SUITE(ega_pow_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(algo_names_and_versions)
 {
-    BOOST_CHECK_EQUAL(NUM_ALGOS, 3);
+    BOOST_CHECK_EQUAL(NUM_ALGOS, 4);
     BOOST_CHECK_EQUAL(GetAlgoName(ALGO_RANDOMX), "randomx");
     BOOST_CHECK_EQUAL(GetAlgoName(ALGO_VERTHASH), "verthash");
     BOOST_CHECK_EQUAL(GetAlgoName(ALGO_YESPOWER_EGA), "yespower-ega");
+    BOOST_CHECK_EQUAL(GetAlgoName(ALGO_SCRYPT), "scrypt");
 
     BOOST_CHECK_EQUAL(GetAlgoByName("randomx", -1), ALGO_RANDOMX);
     BOOST_CHECK_EQUAL(GetAlgoByName("rx", -1), ALGO_RANDOMX);
     BOOST_CHECK_EQUAL(GetAlgoByName("verthash", -1), ALGO_VERTHASH);
     BOOST_CHECK_EQUAL(GetAlgoByName("yespower-ega", -1), ALGO_YESPOWER_EGA);
     BOOST_CHECK_EQUAL(GetAlgoByName("yespower", -1), ALGO_YESPOWER_EGA);
+    BOOST_CHECK_EQUAL(GetAlgoByName("scrypt", -1), ALGO_SCRYPT);
     BOOST_CHECK_EQUAL(GetAlgoByName("nope", 99), 99);
 
     BOOST_CHECK_EQUAL(GetVersionForAlgo(ALGO_RANDOMX), BLOCK_VERSION_RANDOMX);
     BOOST_CHECK_EQUAL(GetVersionForAlgo(ALGO_VERTHASH), BLOCK_VERSION_VERTHASH);
     BOOST_CHECK_EQUAL(GetVersionForAlgo(ALGO_YESPOWER_EGA), BLOCK_VERSION_YESPOWER_EGA);
+    BOOST_CHECK_EQUAL(GetVersionForAlgo(ALGO_SCRYPT), BLOCK_VERSION_SCRYPT);
 }
 
 BOOST_AUTO_TEST_CASE(pow_hashes_differ_by_algo)
@@ -55,15 +58,22 @@ BOOST_AUTO_TEST_CASE(pow_hashes_differ_by_algo)
     header.nVersion = BLOCK_VERSION_DEFAULT | BLOCK_VERSION_YESPOWER_EGA;
     uint256 h_yp = header.GetPoWAlgoHash(params);
 
+    header.nVersion = BLOCK_VERSION_DEFAULT | BLOCK_VERSION_SCRYPT;
+    uint256 h_sc = header.GetPoWAlgoHash(params);
+
     BOOST_CHECK(h_rx != h_vh);
     BOOST_CHECK(h_rx != h_yp);
+    BOOST_CHECK(h_rx != h_sc);
     BOOST_CHECK(h_vh != h_yp);
+    BOOST_CHECK(h_vh != h_sc);
+    BOOST_CHECK(h_yp != h_sc);
 
     // Not the "invalid work" sentinel (~0)
     uint256 maxHash = ArithToUint256(~arith_uint256(0));
     BOOST_CHECK(h_rx != maxHash);
     BOOST_CHECK(h_vh != maxHash);
     BOOST_CHECK(h_yp != maxHash);
+    BOOST_CHECK(h_sc != maxHash);
 }
 
 BOOST_AUTO_TEST_CASE(main_genesis_pow_valid)

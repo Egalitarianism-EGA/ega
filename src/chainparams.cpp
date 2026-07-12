@@ -106,9 +106,9 @@ public:
         consensus.nIntervalRe = consensus.nTargetTimespanRe / consensus.nTargetSpacingRe; // 1 block
 
         consensus.nAveragingInterval = 10; // 10 blocks
-        // MultiShield: per-algo target ≈ NUM_ALGOS(3) × block time(60s)
-        consensus.multiAlgoTargetSpacing = 180;
-        consensus.multiAlgoTargetSpacingV4 = 180;
+        // MultiShield: per-algo target ≈ NUM_ALGOS(4) × block time(60s)
+        consensus.multiAlgoTargetSpacing = 240;
+        consensus.multiAlgoTargetSpacingV4 = 240;
         consensus.nAveragingTargetTimespan = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacing;
         consensus.nAveragingTargetTimespanV4 = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacingV4;
 
@@ -185,7 +185,7 @@ public:
         nDefaultPort = 20201;  // EGA main P2P (RPC 20202 — chainparamsbase)
         nPruneAfterHeight = 100000;
 
-        // EGA main genesis (Phase 4 freeze). RandomX, 0 premine. See docs/ega/phase-4-plan.md
+        // EGA main genesis (RandomX). MultiShield-4 from height 0 (RX/VH/YP/Scrypt).
         genesis = CreateGenesisBlock(
             "EGA fair launch: equality of opportunity, not outcome — anyone may mine.",
             1751846400, 2816, 0x1f0fffff, BLOCK_VERSION_DEFAULT | BLOCK_VERSION_RANDOMX, 0);
@@ -217,7 +217,7 @@ public:
         // No historical DigiByte checkpoints on a new chain.
         checkpointData = {
             {
-                {0, uint256S("943c83429a935b34fb988508440ec8702d217525865f3eea7076d64b4592eda5")},
+                {0, consensus.hashGenesisBlock},
             }
         };
 
@@ -261,8 +261,8 @@ public:
         consensus.nIntervalRe = consensus.nTargetTimespanRe / consensus.nTargetSpacingRe; // 1 block
 
         consensus.nAveragingInterval = 10; // 10 blocks
-        consensus.multiAlgoTargetSpacing = 180; // 3 algos × 60s
-        consensus.multiAlgoTargetSpacingV4 = 180;
+        consensus.multiAlgoTargetSpacing = 240; // 4 algos × 60s
+        consensus.multiAlgoTargetSpacingV4 = 240;
         consensus.nAveragingTargetTimespan = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacing;
         consensus.nAveragingTargetTimespanV4 = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacingV4;
 
@@ -338,11 +338,11 @@ public:
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(
-            "EGA testnet: RandomX + Verthash + YespowerEGA MultiShield",
-            1751846401, 2551, 0x1f0fffff, BLOCK_VERSION_DEFAULT | BLOCK_VERSION_RANDOMX, 0);
+            "EGA testnet: MultiShield-4 RandomX Verthash YespowerEGA Scrypt",
+            1751846401, 2722, 0x1f0fffff, BLOCK_VERSION_DEFAULT | BLOCK_VERSION_RANDOMX, 0);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98"));
-        assert(genesis.hashMerkleRoot == uint256S("6b33d07186b851c3a2e750d2c2d9846be06bfdc18df4cf827d742b0d9c129501"));
+        assert(consensus.hashGenesisBlock == uint256S("acd68ceeba9e198a8f6c7a62afa5c41b96560290fa2c7cc318d678edc401a195"));
+        assert(genesis.hashMerkleRoot == uint256S("ee22876ee16319fa6d5eb6fecbac21035cd1ec9f8f676746b7e21c3989e6038b"));
         assert(CheckProofOfWork(genesis.GetPoWAlgoHash(consensus), genesis.nBits, consensus));
 
         vSeeds.clear();
@@ -363,7 +363,7 @@ public:
 
         checkpointData = {
             {
-                {0, uint256S("86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98")},
+                {0, consensus.hashGenesisBlock},
             }
         };
 
@@ -401,8 +401,8 @@ public:
         consensus.nIntervalRe = consensus.nTargetTimespanRe / consensus.nTargetSpacingRe; // 1 block
 
         consensus.nAveragingInterval = 10; // 10 blocks
-        consensus.multiAlgoTargetSpacing = 180; // 3 algos × 60s
-        consensus.multiAlgoTargetSpacingV4 = 180;
+        consensus.multiAlgoTargetSpacing = 240; // 4 algos × 60s
+        consensus.multiAlgoTargetSpacingV4 = 240;
         consensus.nAveragingTargetTimespan = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacing;
         consensus.nAveragingTargetTimespanV4 = consensus.nAveragingInterval * consensus.multiAlgoTargetSpacingV4;
 
@@ -461,11 +461,11 @@ public:
         nPruneAfterHeight = 1000;
 
         genesis = CreateGenesisBlock(
-            "EGA regtest",
-            1751846402, 0, 0x207fffff, BLOCK_VERSION_DEFAULT | BLOCK_VERSION_RANDOMX, 0);
+            "EGA regtest MultiShield-4",
+            1751846402, 2, 0x207fffff, BLOCK_VERSION_DEFAULT | BLOCK_VERSION_RANDOMX, 0);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256S("7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0"));
-        assert(genesis.hashMerkleRoot == uint256S("492e199b683b7b542713244df27840e94dee345d02ac62c21c79b82b334c02b8"));
+        assert(consensus.hashGenesisBlock == uint256S("beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71"));
+        assert(genesis.hashMerkleRoot == uint256S("9086eeaa14ec3861f3e5fb4d6b37e7ab3dc2b7015eb12341da43cdaeb574460f"));
         assert(CheckProofOfWork(genesis.GetPoWAlgoHash(consensus), genesis.nBits, consensus));
 
         vFixedSeeds.clear();
@@ -477,7 +477,7 @@ public:
 
         checkpointData = {
             {
-                {0, uint256S("7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0")},
+                {0, consensus.hashGenesisBlock},
             }
         };
 

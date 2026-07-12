@@ -15,18 +15,28 @@ Source of truth for numbers: also see `design.md`. Update both together.
 | `BLOCK_TIME_SECONDS` | `60` |
 | `GENESIS_REWARD` | `0` |
 
-## Proof of work
+## Proof of work (MultiShield-4)
 
 | Key | Value |
 |-----|--------|
-| `NUM_ALGOS` | `3` |
+| `NUM_ALGOS` | `4` |
 | `ALGO_0` | `RandomX` |
 | `ALGO_1` | `Verthash` |
 | `ALGO_2` | `YespowerEGA` |
-| `DIFFICULTY` | `MultiShield-V4-style from height 0` |
-| `MULTI_ALGO_TARGET_SPACING` | `180` (seconds, 3 × block time) |
+| `ALGO_3` | `Scrypt` |
+| Target share | ~**25% each** |
+| `DIFFICULTY` | MultiShield-V4-style from height 0 |
+| `MULTI_ALGO_TARGET_SPACING` | `240` (seconds, 4 × block time) |
+| Reward | Same subsidy for every algo |
 
-## YespowerEGA (Phase 3 lock)
+| Algo | Hardware | Role |
+|------|----------|------|
+| RandomX | Modern CPU / laptop | People CPU |
+| Verthash | Consumer GPU | People GPU |
+| YespowerEGA | Phone / Pi / weak CPU | Inclusion |
+| Scrypt | ASIC / capital market | Security hard door |
+
+## YespowerEGA
 
 | Key | Value |
 |-----|--------|
@@ -35,7 +45,7 @@ Source of truth for numbers: also see `design.md`. Update both together.
 | `N` | `2048` |
 | `r` | `32` (~256 KiB working memory) |
 
-## RandomX (Phase 3)
+## RandomX
 
 | Key | Value |
 |-----|--------|
@@ -43,7 +53,7 @@ Source of truth for numbers: also see `design.md`. Update both together.
 | seed tag | `EGA-RandomX` |
 | epoch | `nTime / (2048 * 60)` seconds |
 
-## Verthash (Phase 3)
+## Verthash
 
 | Key | Value |
 |-----|--------|
@@ -51,7 +61,14 @@ Source of truth for numbers: also see `design.md`. Update both together.
 | dataset size | 256 MiB |
 | dataset tag | `EGA-Verthash-v1` (SHA256 expansion) |
 
-## Network identity (Phase 2)
+## Scrypt
+
+| Key | Value |
+|-----|--------|
+| function | `scrypt_1024_1_1_256` (Litecoin/DigiByte-compatible) |
+| input | 80-byte block header |
+
+## Network identity
 
 | Network | Magic | P2P | RPC | bech32 HRP |
 |---------|-------|-----|-----|------------|
@@ -64,12 +81,12 @@ Source of truth for numbers: also see `design.md`. Update both together.
 | base58 pubkey version | `33` (leading `E`) |
 | base58 script version | `92` |
 | base58 secret version | `176` |
-| DNS / fixed seeds | empty until community adds |
-| checkpoints | genesis only (Phase 4) |
-| assumevalid / min chain work | `0x00` |
 | main genesis hash | `943c83429a935b34fb988508440ec8702d217525865f3eea7076d64b4592eda5` |
-| main nBits | `0x1f0fffff` (`powLimit` = `~0 >> 12`) |
+| test genesis hash | `acd68ceeba9e198a8f6c7a62afa5c41b96560290fa2c7cc318d678edc401a195` |
+| regtest genesis hash | `beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71` |
+| main nBits | `0x1f0fffff` |
 | genesis algo | RandomX (`nVersion` = 2) |
 | data directory | `~/.ega` |
 | config / pid | `ega.conf` / `egad.pid` |
-| wrappers | `contrib/ega/egad`, `ega-cli`, `ega-tx` → digibyte* binaries |
+
+**Note:** Adding Scrypt is a consensus change. Wipe local chain data after upgrading (`scripts/reset-mainnet-datadir.sh`) before mining MultiShield-4 blocks.

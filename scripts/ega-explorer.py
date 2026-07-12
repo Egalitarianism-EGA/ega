@@ -22,12 +22,12 @@ RPC_PASS = os.environ.get("EGA_RPC_PASS", "")
 
 # EGA consensus (frozen params)
 BLOCK_TIME = 60  # overall target seconds
-NUM_ALGOS = 3
-ALGO_TARGET_SPACING = BLOCK_TIME * NUM_ALGOS  # MultiShield ~180s per algo
+NUM_ALGOS = 4
+ALGO_TARGET_SPACING = BLOCK_TIME * NUM_ALGOS  # MultiShield ~240s per algo
 HALVING_INTERVAL = 210_000
 INITIAL_SUBSIDY = 50_000  # EGA
 MAX_SUPPLY = 21_000_000_000
-ALGOS = ("randomx", "verthash", "yespower-ega")
+ALGOS = ("randomx", "verthash", "yespower-ega", "scrypt")
 
 
 def load_rpc_from_conf() -> None:
@@ -241,7 +241,7 @@ CSS = """
 :root{
   --bg:#070b14;--panel:#0f1626;--panel2:#141e32;--line:#1e2a42;
   --text:#e8eef9;--muted:#8b9bb8;--accent:#2dd4bf;--accent2:#14b8a6;
-  --gold:#e2b84a;--row:#0c1322;--rowh:#12203a;--rx:#60a5fa;--vh:#a78bfa;--yp:#34d399;
+  --gold:#e2b84a;--row:#0c1322;--rowh:#12203a;--rx:#60a5fa;--vh:#a78bfa;--yp:#34d399;--sc:#fbbf24;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
@@ -287,6 +287,7 @@ tr:last-child td,tr:last-child th{border-bottom:0}
 .badge-rx{background:rgba(96,165,250,.15);color:var(--rx)}
 .badge-vh{background:rgba(167,139,250,.15);color:var(--vh)}
 .badge-yp{background:rgba(52,211,153,.15);color:var(--yp)}
+.badge-sc{background:rgba(251,191,36,.15);color:var(--sc)}
 .badge-gold{background:rgba(226,184,74,.14);color:var(--gold)}
 .err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#fecaca;
   padding:1rem;border-radius:12px;margin:1rem 0}
@@ -314,6 +315,8 @@ def algo_badge(algo: str) -> str:
         cls += " badge-vh"
     elif "yespower" in a:
         cls += " badge-yp"
+    elif a == "scrypt":
+        cls += " badge-sc"
     return f'<span class="{cls}">{esc(algo or "—")}</span>'
 
 
@@ -338,7 +341,7 @@ def layout(title: str, body: str) -> bytes:
   {body}
   <footer>
     <span>Egalitarianism explorer · auto-refresh 60s</span>
-    <span class="mono">target {BLOCK_TIME}s · MultiShield · 3 algos</span>
+    <span class="mono">target {BLOCK_TIME}s · MultiShield-4</span>
   </footer>
 </div>
 </body></html>"""
@@ -421,7 +424,7 @@ class Handler(BaseHTTPRequestHandler):
         reward = snap["reward"]
 
         # algo table rows
-        colors = {"randomx": "var(--rx)", "verthash": "var(--vh)", "yespower-ega": "var(--yp)"}
+        colors = {"randomx": "var(--rx)", "verthash": "var(--vh)", "yespower-ega": "var(--yp)", "scrypt": "var(--sc)"}
         algo_rows = []
         for a in snap["algos"]:
             name = a["algo"]

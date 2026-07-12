@@ -123,12 +123,13 @@ void CBlockIndex::BuildSkip()
 int GetAlgoWorkFactor(int nHeight, int algo) 
 {
     (void)nHeight;
-    // EGA: equal work factor for RandomX, Verthash, YespowerEGA (MultiShield balances shares).
+    // EGA: equal work factor for all MultiShield-4 algos (share ~1/4 each).
     switch (algo)
     {
         case ALGO_RANDOMX:
         case ALGO_VERTHASH:
         case ALGO_YESPOWER_EGA:
+        case ALGO_SCRYPT:
             return 1;
         default:
             return 1;
