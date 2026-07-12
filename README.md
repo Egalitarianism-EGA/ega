@@ -117,6 +117,7 @@ MIT. See [COPYING](COPYING). Based on DigiByte / Bitcoin Core; EGA-specific work
 **Launch checklist:** [docs/ega/LAUNCH.md](docs/ega/LAUNCH.md)
 **Status & roadmap:** [docs/ega/STATUS-AND-ROADMAP.md](docs/ega/STATUS-AND-ROADMAP.md)  
 **Whitepaper (draft):** [docs/ega/WHITEPAPER.md](docs/ega/WHITEPAPER.md)
+**All GitHub repos:** [docs/ega/REPOS.md](docs/ega/REPOS.md)
 
 Recommended configure for mining:
 
