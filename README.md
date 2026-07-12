@@ -95,7 +95,19 @@ bash scripts/easy-wallet.sh
 bash scripts/easy-mine.sh randomx
 ```
 
-Plain English: [docs/ega/FOR-HUMANS.md](docs/ega/FOR-HUMANS.md) · Continuity file: [EGA-HANDOFF.txt](EGA-HANDOFF.txt)
+Desktop menu apps (Wallet / Node / Miner):
+
+```bash
+bash scripts/install-desktop-apps.sh
+```
+
+Two miners, one chain (local proof):
+
+```bash
+bash scripts/two-node-mining-demo.sh
+```
+
+Getting started: [docs/ega/getting-started.md](docs/ega/getting-started.md) · Network mining: [docs/ega/network-mining.md](docs/ega/network-mining.md) · Handoff: [EGA-HANDOFF.txt](EGA-HANDOFF.txt)
 
 
 ```bash

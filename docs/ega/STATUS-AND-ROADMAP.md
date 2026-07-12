@@ -59,14 +59,17 @@
 | **DNS seeds** | Empty | Later; until then `addnode=IP` |
 | **Explorer** | Config only | Blockbook/Insight on your PC + free tunnel |
 | **Stratum pool** | Config only | Miningcore on your PC (heavier: needs Postgres) |
-| **Website** | None | Free: GitHub Pages / Cloudflare Pages |
-| **Whitepaper** | Outline next | Markdown in repo |
+| **Website** | Live (Pages) | https://egalitarianism-ega.github.io/ega-website/ |
+| **Whitepaper** | Draft in repo | `docs/ega/WHITEPAPER.md` |
+| **Multi-node mining** | Demo verified | `scripts/two-node-mining-demo.sh` |
 
 ### Product / go-to-market
 
-- Tokenomics one-pager + full whitepaper  
-- Roadmap graphic  
-- How-to-mine for end users  
+- [x] Getting started guide (`docs/ega/getting-started.md`)  
+- [x] Desktop app launchers (Wallet / Node / Miner)  
+- [x] Network multi-miner docs  
+- [ ] Prebuilt Releases for non-builders  
+- [ ] Public seed IP list  
 - Security review of wallet/RPC exposure if you open ports to internet  
 
 ---
