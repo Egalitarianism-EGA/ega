@@ -83,12 +83,13 @@ public:
         consensus.initialTarget[ALGO_RANDOMX] = consensus.powLimit;
         consensus.initialTarget[ALGO_VERTHASH] = consensus.powLimit;
         consensus.initialTarget[ALGO_YESPOWER_EGA] = consensus.powLimit;
+        consensus.initialTarget[ALGO_SCRYPT] = consensus.powLimit;
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks (legacy interval math)
         consensus.nPowTargetSpacing = 60;  // EGA: 1 minute blocks (overall)
 
         /** EGA Difficulty & Block Target (docs/ega/design.md)
-        - Triple PoW (Phase 3): RandomX + Verthash + YespowerEGA
-        - 60 second blocks overall; MultiShield per-algo spacing 180s (3 × 60)
+        - MultiShield-4: RandomX + Verthash + YespowerEGA + Scrypt
+        - 60 second blocks overall; MultiShield per-algo spacing 240s (4 × 60)
         - 21B max supply, 50,000 EGA/block, halving every 210,000 blocks
         - MultiShield V4-style difficulty from height 0
         **/
@@ -244,6 +245,7 @@ public:
         consensus.initialTarget[ALGO_RANDOMX] = consensus.powLimit;
         consensus.initialTarget[ALGO_VERTHASH] = consensus.powLimit;
         consensus.initialTarget[ALGO_YESPOWER_EGA] = consensus.powLimit;
+        consensus.initialTarget[ALGO_SCRYPT] = consensus.powLimit;
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 60;  // EGA: 1 min blocks
 

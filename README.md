@@ -124,7 +124,7 @@ Regtest smoke:
 datadir=$(mktemp -d)
 ./src/egad -regtest -datadir="$datadir" -daemon
 ./src/ega-cli -regtest -datadir="$datadir" getblockhash 0
-# expect 7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0
+# expect beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71
 ./src/ega-cli -regtest -datadir="$datadir" stop
 ```
 

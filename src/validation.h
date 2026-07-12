@@ -67,7 +67,7 @@ static const bool DEFAULT_WHITELISTRELAY = true;
 /** Default for -whitelistforcerelay. */
 static const bool DEFAULT_WHITELISTFORCERELAY = true;
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
-static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 10000000;  // EGA: ~0.00001 EGA per kB (low dynamic fee)
+static const unsigned int DEFAULT_MIN_RELAY_TX_FEE = 1000;  // EGA: 0.00001 EGA/kB (below HIGH_TX_FEE_PER_KB warn)
 //! -maxtxfee default
 static const CAmount DEFAULT_TRANSACTION_MAXFEE = 1.0 * COIN;
 //! Discourage users to set fees higher than this amount (in satoshis) per kB

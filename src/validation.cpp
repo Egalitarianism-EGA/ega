@@ -2295,11 +2295,10 @@ void static UpdateTip(const CBlockIndex *pindexNew, const CChainParams& chainPar
             if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
             {
                 ++nUpgraded;
-                // Sha256d blocks with weird versions could simply be the result
-                // of overt AsicBoost.  Don't print the first warning below unless
-                // at least one "upgraded" block is not sha256d.
-                if (nAlgo != ALGO_RANDOMX && nAlgo != ALGO_VERTHASH && nAlgo != ALGO_YESPOWER_EGA)
-                    fAllAsicBoost = false;  // EGA: any non-EGA algo is unexpected
+                // Don't treat known MultiShield-4 algos as "unexpected" version noise.
+                if (nAlgo != ALGO_RANDOMX && nAlgo != ALGO_VERTHASH &&
+                    nAlgo != ALGO_YESPOWER_EGA && nAlgo != ALGO_SCRYPT)
+                    fAllAsicBoost = false;  // EGA: unknown algo bits are unexpected
             }
             pindex = pindex->pprev;
         }

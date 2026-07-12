@@ -23,7 +23,7 @@
 | Genesis freeze (main/test/regtest) | **Done** |
 | Network identity (ports, magic, bech32 `ega`, `~/.ega`) | **Done** |
 | Binaries `egad` / `ega-cli` / `ega-tx` / `ega-qt` | **Built locally** |
-| Wallet RPC + solo mine all 4 algos | **Verified** |
+| Wallet RPC + solo mine all 4 algos (MultiShield-4) | **Verified** |
 | GPU Verthash (OpenCL, your RTX) | **Verified ~0.9 MH/s** |
 | Logos + docs under `docs/ega/` | **Done** |
 | GitHub org repos | **Live** (see below) |

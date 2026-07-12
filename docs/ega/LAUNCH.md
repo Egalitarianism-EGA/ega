@@ -15,7 +15,7 @@ Anyone can:
 | Item | Status |
 |------|--------|
 | Consensus params + genesis | **Done** |
-| Triple PoW + MultiShield | **Done** |
+| MultiShield-4 PoW (RX + VH + YP + Scrypt) | **Done** |
 | Wallet Linux build (`--enable-wallet --with-incompatible-bdb`) | **Done** (verified) |
 | Solo mine all 4 algos (`generatetoaddress`) | **Done** (regtest verified) |
 | `getblocktemplate` solo without peers / IBD block | **Done** |

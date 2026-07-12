@@ -1,27 +1,30 @@
 # Phase 4 — Genesis freeze
 
-**Status:** Implemented (2026-07-12)  
-**Tool:** `src/ega_mine_genesis` (rebuild with `make -C src ega_mine_genesis`)
+**Status:** Implemented (MultiShield-4)  
+**Tool:** `src/ega_mine_genesis` (rebuild with `make -C src ega_mine_genesis`)  
+**Canonical values:** also in `docs/ega/params.md` and `src/chainparams.cpp` asserts.
 
-## Frozen genesis (RandomX, 0 premine)
+## Frozen genesis (RandomX coinbase header, 0 premine)
 
 | Network | time | nonce | nBits | nVersion | hashGenesisBlock |
 |---------|------|-------|-------|----------|------------------|
 | **main** | 1751846400 | 2816 | `0x1f0fffff` | 2 (RandomX) | `943c83429a935b34fb988508440ec8702d217525865f3eea7076d64b4592eda5` |
-| **test** | 1751846401 | 2551 | `0x1f0fffff` | 2 | `86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98` |
-| **regtest** | 1751846402 | 0 | `0x207fffff` | 2 | `7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0` |
+| **test** | 1751846401 | 2722 | `0x1f0fffff` | 2 | `acd68ceeba9e198a8f6c7a62afa5c41b96560290fa2c7cc318d678edc401a195` |
+| **regtest** | 1751846402 | 2 | `0x207fffff` | 2 | `beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71` |
+
+> **Note:** test/regtest genesis were re-mined for MultiShield-4 coinbase text. Main genesis hash is unchanged from the original fair-launch freeze.
 
 ### Coinbase messages
 
 - main: `EGA fair launch: equality of opportunity, not outcome — anyone may mine.`
-- test: `EGA testnet: RandomX + Verthash + YespowerEGA MultiShield`
-- regtest: `EGA regtest`
+- test: `EGA testnet: MultiShield-4 RandomX Verthash YespowerEGA Scrypt`
+- regtest: `EGA regtest MultiShield-4`
 
 ### Merkle roots
 
 - main: `e30d15a8674c033ae2e00393f849b1d1bed85970b2aa7a5c6b843722020ddf01`
-- test: `6b33d07186b851c3a2e750d2c2d9846be06bfdc18df4cf827d742b0d9c129501`
-- regtest: `492e199b683b7b542713244df27840e94dee345d02ac62c21c79b82b334c02b8`
+- test: `ee22876ee16319fa6d5eb6fecbac21035cd1ec9f8f676746b7e21c3989e6038b`
+- regtest: `9086eeaa14ec3861f3e5fb4d6b37e7ab3dc2b7015eb12341da43cdaeb574460f`
 
 ## Validation
 
@@ -41,10 +44,10 @@ Regtest: max target (easy).
 ## Smoke test
 
 ```bash
-make -C src digibyted digibyte-cli
+make -C src egad ega-cli
 datadir=$(mktemp -d)
-./src/digibyted -regtest -datadir="$datadir" -daemon
-./src/digibyte-cli -regtest -datadir="$datadir" getblockhash 0
-# expect 7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0
-./src/digibyte-cli -regtest -datadir="$datadir" stop
+./src/egad -regtest -datadir="$datadir" -daemon
+./src/ega-cli -regtest -datadir="$datadir" getblockhash 0
+# expect beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71
+./src/ega-cli -regtest -datadir="$datadir" stop
 ```

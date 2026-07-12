@@ -161,7 +161,7 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
             "1. nblocks      (numeric, required) How many blocks are generated immediately.\n"
             "2. address      (string, required) The address to send the newly generated EGA to.\n"
             "3. maxtries     (numeric, optional) How many iterations to try (default = 1000000).\n"
-            "4. algo         (string, optional) Mining algo: randomx | verthash | yespower-ega\n"
+            "4. algo         (string, optional) Mining algo: randomx | verthash | yespower-ega | scrypt\n"
             "\nResult:\n"
             "[ blockhashes ]     (array) hashes of blocks generated\n"
             "\nExamples:\n"
@@ -318,7 +318,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
             "    https://github.com/digibyte/bips/blob/master/bip-0023.mediawiki\n"
             "    https://github.com/digibyte/bips/blob/master/bip-0009.mediawiki#getblocktemplate_changes\n"
             "    https://github.com/digibyte/bips/blob/master/bip-0145.mediawiki\n"
-            "\nEGA: optional 2nd arg selects PoW algo: randomx | verthash | yespower-ega\n"
+            "\nEGA: optional 2nd arg selects PoW algo: randomx | verthash | yespower-ega | scrypt\n"
             "Fair launch: peers/IBD not required for templates (use -gbtrequirepeers=1 later).\n"
 
             "\nArguments:\n"
@@ -334,7 +334,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
             "           ,...\n"
             "       ]\n"
             "     }\n"
-            "2. algo    (string, optional) The mining algorithm to use for this pow hash, 'sha256d', 'scrypt', 'groestl', 'skein', 'qubit', 'odo'\n"
+            "2. algo    (string, optional) MultiShield-4 algo: randomx | verthash | yespower-ega | scrypt\n"
             "\n"
 
             "\nResult:\n"

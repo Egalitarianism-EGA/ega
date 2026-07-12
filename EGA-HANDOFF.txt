@@ -3,15 +3,17 @@ EGALITARIANISM (EGA) — PROJECT HANDOFF
 ================================================================================
 If this chat dies, open this file first.
 Full name: Egalitarianism · Ticker: EGA
-Last updated: 2026-07-12
+Last updated: 2026-07-12 (MultiShield-4 audit)
 
 ================================================================================
 1. WHAT THIS PROJECT IS
 ================================================================================
 - Fair-launch multi-algo PoW cryptocurrency (fork of DigiByte/Bitcoin Core).
-- Anyone can mine: CPU, GPU, phone/Pi — no premine.
+- Anyone can mine: CPU, GPU, phone/Pi — plus one hard door (Scrypt).
 - Algorithms from genesis: RandomX + Verthash + YespowerEGA + Scrypt (MultiShield-4).
 - Block ~60s, subsidy 50,000 EGA, halve every 210,000 blocks, max 21B EGA, 8 decimals.
+- Same subsidy regardless of which algo wins the block.
+- MultiShield independent difficulty → ~25% share per algo.
 
 ================================================================================
 2. GITHUB ORG (Egalitarianism-EGA)
@@ -29,14 +31,14 @@ Pages URL:        https://egalitarianism-ega.github.io/ega-website/
 Local tree: /home/daimondsteel259/ega
 Remote: Egalitarianism-EGA/ega (main)
 
-SECURITY: A GitHub PAT was used in past chat history — REVOKE when work is fully done.
-Never commit tokens. Prefer gh auth.
+SECURITY: A GitHub PAT was used in past chat history — REVOKE when fully done.
+Never commit tokens.
 
 ================================================================================
-3. FROZEN MAINNET PARAMS (DO NOT CHANGE CASUALLY)
+3. FROZEN MAINNET PARAMS
 ================================================================================
 Max supply:           21_000_000_000 EGA
-Decimals:             8 (COIN = 100_000_000)
+Decimals:             8
 Subsidy:              50_000 EGA / block
 Halving:              every 210_000 blocks
 Block time target:    60 seconds
@@ -46,160 +48,94 @@ Magic:                e4 47 41 01
 bech32:               ega
 Data dir:             ~/.ega
 Config:               ~/.ega/ega.conf
-PID:                  egad.pid
+
+NUM_ALGOS:            4
+  0 randomx       modern CPU
+  1 verthash      consumer GPU
+  2 yespower-ega  phone/Pi (N=2048 r=32 pers=YespowerEGA)
+  3 scrypt        hard door (scrypt_1024_1_1_256)
+MultiShield spacing:  240s per algo (4×60)
+Target share:         ~25% each
 
 Genesis main:
   time=1751846400 nonce=2816 nBits=0x1f0fffff nVersion=2 (RandomX)
   hash=943c83429a935b34fb988508440ec8702d217525865f3eea7076d64b4592eda5
   merkle=e30d15a8674c033ae2e00393f849b1d1bed85970b2aa7a5c6b843722020ddf01
 
-Genesis regtest: 7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0
-Genesis test:    86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98
+Genesis test:
+  hash=acd68ceeba9e198a8f6c7a62afa5c41b96560290fa2c7cc318d678edc401a195
+  merkle=ee22876ee16319fa6d5eb6fecbac21035cd1ec9f8f676746b7e21c3989e6038b
 
-YespowerEGA: N=2048 r=32 pers="YespowerEGA" YESPOWER_1_0
-Scrypt: scrypt_1024_1_1_256 (hard door)
-MultiShield share: ~25% each; spacing 240s per algo
-Verthash dataset: tag EGA-Verthash-v1 size 256 MiB (NOT Vertcoin official dat)
+Genesis regtest:
+  hash=beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71
+  merkle=9086eeaa14ec3861f3e5fb4d6b37e7ab3dc2b7015eb12341da43cdaeb574460f
+
+Verthash dataset: tag EGA-Verthash-v1 size 256 MiB
 RandomX: light VM; seed tag EGA-RandomX; epoch nTime/(2048*60)
+GBT: peers/IBD not required by default
 
-powLimit main: ~0 >> 12 (compact 0x1f0fffff)
-GBT: peers/IBD not required by default (-gbtrequirepeers=0)
-
-Truth docs:
-  docs/ega/params.md
-  docs/ega/design.md
-  docs/ega/WHITEPAPER.md
-  docs/ega/STATUS-AND-ROADMAP.md
-  docs/ega/REPOS.md
-  docs/ega/getting-started.md
-  docs/ega/network-mining.md
+Truth docs: docs/ega/params.md · design.md · WHITEPAPER.md · MULTI-ALGO-SECURITY.md
 
 ================================================================================
-4. BINARIES
+4. BINARIES & RUN (THIS PC)
 ================================================================================
-src/egad          — full node
-src/ega-cli       — RPC client
-src/ega-tx        — tx util
-src/qt/ega-qt     — desktop wallet GUI (Qt5 build)
+src/egad  src/ega-cli  src/ega-tx  src/qt/ega-qt
 
-Configure (node):
+Configure:
   ./configure --with-daemon --without-gui --enable-wallet --with-incompatible-bdb
-GUI:
-  ./configure --with-gui=qt5 --enable-wallet --with-incompatible-bdb
 
-cmake REQUIRED (RandomX under src/crypto/randomx/).
+Scripts:
+  scripts/easy-install-linux.sh
+  scripts/easy-start.sh / easy-wallet.sh / easy-mine.sh [algo]
+  scripts/ega-explorer.sh          → :8088
+  scripts/start-miningcore.sh      → API :4000 stratum Verthash :3334
+  scripts/start-pool-stack.sh      → Postgres
+  scripts/two-node-mining-demo.sh
+  scripts/reset-mainnet-datadir.sh
+  scripts/make-release.sh
+  docs/ega/smoke-regtest.sh
+  docs/ega/mine-all-algos-regtest.sh
 
-Hardware proven on this PC:
-  CPU: AMD Ryzen 5 7600 — RandomX + YespowerEGA mainnet blocks mined
-  GPU: RTX 5060 Ti OpenCL — VerthashMiner ~900 kH/s
+Mining:
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 randomx
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 yespower-ega
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 scrypt
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 verthash
 
 ================================================================================
 5. DONE vs NOT DONE
 ================================================================================
 DONE:
-  [x] Consensus + 3 PoW + MultiShield + genesis
-  [x] Network identity, branding, logos (logo/)
-  [x] Wallet RPC + ega-qt binary build
-  [x] Solo mining all 4 algos (incl. Scrypt)
-  [x] GPU Verthash path documented + tested
-  [x] Org repos created and pushed
-  [x] Whitepaper draft + roadmap docs
-  [x] CI workflow cache v4
-  [x] Website redesigned (product-style, not slop)
-  [x] getting-started.md (replaces FOR-HUMANS naming)
-  [x] Desktop app launchers: Wallet, Node, Miner
-  [x] Two-node same-chain mining demo (scripts/two-node-mining-demo.sh) — VERIFIED
-  [x] network-mining.md (peer multi-miner setup)
-  [x] Multi-page website (whitepaper/start/mine/explorer/pool on-site)
-  [x] Lightweight explorer: scripts/ega-explorer.py (local :8088)
-  [x] Pool stack scaffold: scripts/start-pool-stack.sh (Postgres + config)
-  [x] Live pool dashboard + stratum: scripts/ega-pool.sh (:8089 / :3333)
-  [x] Explorer genesis tx fix + dark UI
-  [x] Prebuilt release script + GitHub Release v0.1.0
-  [x] Website: user-facing branded multipage
+  [x] MultiShield-4 consensus (RX+VH+YP+Scrypt)
+  [x] Solo mine all 4 algos verified
+  [x] Two-node shared tip verified
+  [x] Explorer with per-algo difficulty/hashrate/rewards
+  [x] Miningcore Verthash pool online (this PC)
+  [x] Website + all org hub docs MultiShield-4
+  [x] Prebuilt release v0.1.0 (may predate Scrypt — rebuild for new binary)
 
 NOT DONE / NEXT:
-  [ ] Confirm CI green on latest main
-  [ ] 24/7 mainnet egad seed on owner PC
-  [ ] Public seed IPs / addnode list
-  [ ] Prebuilt release tarball on GitHub Releases
-  [ ] Miningcore binary built/run with EGA RandomX (Postgres ready)
-  [ ] Public explorer URL (tunnel / VPS) — local explorer works
-  [ ] Windows release package
-  [ ] macOS (deferred)
-  [ ] Light/mobile wallet (later)
-  [ ] Deep DigiByte string cleanup
-  [ ] Revoke GitHub PAT when finished
+  [ ] New GitHub Release binary after MultiShield-4
+  [ ] 24/7 public seed IP / addnode list
+  [ ] Public explorer URL (tunnel)
+  [ ] Miningcore RandomX/Yespower/Scrypt full share-verify (or stock scrypt pool profile live)
+  [ ] Windows / macOS packages
+  [ ] CI green confirm
+  [ ] Revoke GitHub PAT
 
 ================================================================================
-6. USER PATH (APPS + SCRIPTS)
+6. UPGRADE / WIPE
 ================================================================================
-Install:
-  bash scripts/easy-install-linux.sh
+MultiShield-4 is a consensus change from 3-algo builds.
+Anyone who mined 3-algo-only chain must wipe datadir:
 
-Desktop menu (Linux):
-  bash scripts/install-desktop-apps.sh
-  → Egalitarianism Wallet / Node / Miner
-
-Run:
-  bash scripts/easy-start.sh      # node
-  bash scripts/easy-wallet.sh     # address + backup tip
-  bash scripts/easy-mine.sh randomx   # solo mine
-  bash scripts/two-node-mining-demo.sh  # prove 2 miners = one chain
-  bash scripts/ega-explorer.sh        # local explorer :8088
-  bash scripts/start-pool-stack.sh    # pool Postgres + example config
-
-Docs:
-  docs/ega/getting-started.md
-  docs/ega/network-mining.md
-  docs/ega/SHARED-MINING.md   # solo vs network vs pool (plain English)
-  Website pages: start / mine / whitepaper / explorer / pool / specs
-
-Mining modes:
-  A) Solo — you keep blocks you find
-  B) Multi-node network — friends addnode; same tip; each keeps own blocks
-  C) Pool — shared rewards (Miningcore later)
-
-B is "normal crypto blockchain" multi-miner. C is optional.
+  bash scripts/reset-mainnet-datadir.sh
 
 ================================================================================
-7. MINE CHEAT SHEET
+7. NEW CHAT
 ================================================================================
-CPU RandomX:
-  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 randomx
-
-CPU YespowerEGA:
-  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 yespower-ega
-
-Scrypt (hard door):
-  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 scrypt
-
-GPU Verthash:
-  # ega.conf: algo=verthash
-  # Dataset from ega-verthash-miner; VerthashMiner OpenCL GBT
-
-================================================================================
-8. WEBSITE (GITHUB PAGES)
-================================================================================
-Repo: Egalitarianism-EGA/ega-website
-URL:  https://egalitarianism-ega.github.io/ega-website/
-Source: main branch, root. .nojekyll present.
-
-If stuck on old HTML: Settings → Pages → re-save branch, or push a small commit.
-
-================================================================================
-9. LOCAL MACHINE
-================================================================================
-Path: /home/daimondsteel259/ega
-Wallet BDB: --with-incompatible-bdb
-Config header: ega-config.h
-
-================================================================================
-10. NEW CHAT
-================================================================================
-"Continue Egalitarianism from EGA-HANDOFF.txt in the ega repo."
-Read: EGA-HANDOFF.txt, docs/ega/REPOS.md, docs/ega/params.md, docs/ega/STATUS-AND-ROADMAP.md
-Priority: seed node live → release binaries → optional pool/explorer.
+"Continue Egalitarianism from EGA-HANDOFF.txt"
+Read: EGA-HANDOFF.txt, docs/ega/params.md, docs/ega/REPOS.md
 
 END OF HANDOFF
 ================================================================================
