@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Egalitarianism block explorer — local UI over egad RPC (stdlib only)."""
+"""Egalitarianism block explorer — polished UI over local egad RPC."""
 from __future__ import annotations
 
 import base64
@@ -7,6 +7,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -27,7 +28,6 @@ def load_rpc_from_conf() -> None:
     conf = Path.home() / ".ega" / "ega.conf"
     if not conf.is_file():
         return
-    user = passwd = port = None
     for line in conf.read_text(errors="replace").splitlines():
         line = line.split("#", 1)[0].strip()
         if not line or "=" not in line:
@@ -35,17 +35,11 @@ def load_rpc_from_conf() -> None:
         k, v = line.split("=", 1)
         k, v = k.strip().lower(), v.strip()
         if k == "rpcuser":
-            user = v
+            RPC_USER = v
         elif k == "rpcpassword":
-            passwd = v
+            RPC_PASS = v
         elif k == "rpcport":
-            port = v
-    if user:
-        RPC_USER = user
-    if passwd:
-        RPC_PASS = passwd
-    if port:
-        RPC_URL = f"http://127.0.0.1:{port}"
+            RPC_URL = f"http://127.0.0.1:{v}"
 
 
 def rpc(method: str, params=None):
@@ -64,7 +58,7 @@ def rpc(method: str, params=None):
             data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")
-        raise RuntimeError(f"RPC HTTP {e.code}: {body[:500]}") from e
+        raise RuntimeError(f"RPC HTTP {e.code}: {body[:400]}") from e
     except Exception as e:
         raise RuntimeError(f"RPC error: {e}") from e
     if data.get("error"):
@@ -85,58 +79,106 @@ def esc(s) -> str:
     )
 
 
+def fmt_time(ts) -> str:
+    try:
+        return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(int(ts)))
+    except Exception:
+        return str(ts or "—")
+
+
+def short(h: str, n: int = 10) -> str:
+    h = str(h or "")
+    if len(h) <= n * 2:
+        return h
+    return f"{h[:n]}…{h[-n:]}"
+
+
 CSS = """
-:root { --bg:#0b1220; --card:#152038; --line:#243049; --text:#eef2f8; --muted:#9aa8c0; --accent:#2dd4bf; }
-* { box-sizing:border-box; margin:0; padding:0; }
-body { font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
-.wrap { max-width:960px; margin:0 auto; padding:1rem 1.2rem 2.5rem; }
-header { display:flex; justify-content:space-between; align-items:center; gap:.75rem; flex-wrap:wrap;
-  border-bottom:1px solid var(--line); padding:.85rem 0 1rem; margin-bottom:1.1rem; }
-.brand { display:flex; align-items:center; gap:.55rem; color:var(--text); text-decoration:none; font-weight:700; }
-.brand .dot { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#2dd4bf,#0f766e); }
-a { color:var(--accent); text-decoration:none; }
-a:hover { color:#5eead4; }
-h1 { font-size:1.35rem; margin:0 0 .85rem; letter-spacing:-.02em; }
-h2 { font-size:1.05rem; margin:1.25rem 0 .55rem; }
-.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:.65rem; margin:1rem 0; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:.8rem; }
-.card .n { font-size:1.25rem; font-weight:750; }
-.card .l { color:var(--muted); font-size:.82rem; margin-top:.15rem; }
-table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line);
-  border-radius:12px; overflow:hidden; font-size:.92rem; }
-th,td { text-align:left; padding:.55rem .75rem; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
-th { width:26%; color:var(--muted); background:rgba(0,0,0,.18); font-weight:600; }
-tr:last-child th, tr:last-child td { border-bottom:none; }
-form { display:flex; gap:.45rem; flex-wrap:wrap; margin:1rem 0; }
-input[type=text] { flex:1; min-width:180px; padding:.55rem .7rem; border-radius:8px; border:1px solid var(--line);
-  background:#0a1220; color:var(--text); }
-button { padding:.55rem .9rem; border:0; border-radius:8px; background:var(--accent); color:#042f2e; font-weight:700; cursor:pointer; }
-.err { background:rgba(248,113,113,.1); border:1px solid rgba(248,113,113,.35); color:#fecaca;
-  padding:.85rem 1rem; border-radius:10px; margin:.75rem 0; }
-.note { background:rgba(45,212,191,.08); border:1px solid rgba(45,212,191,.25); color:#b7f5eb;
-  padding:.85rem 1rem; border-radius:10px; margin:.75rem 0; font-size:.92rem; }
-.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:.84rem; }
-.muted { color:var(--muted); }
-footer { margin-top:2rem; color:var(--muted); font-size:.85rem; }
-ul { margin:.4rem 0 .8rem 1.1rem; color:var(--muted); }
-li { margin:.25rem 0; }
+:root{
+  --bg:#070b14;--panel:#0f1626;--panel2:#141e32;--line:#1e2a42;
+  --text:#e8eef9;--muted:#8b9bb8;--accent:#2dd4bf;--accent2:#14b8a6;
+  --gold:#e2b84a;--row:#0c1322;--rowh:#12203a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+a:hover{color:#5eead4}
+.shell{max-width:1100px;margin:0 auto;padding:0 1.1rem 2.5rem}
+.top{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:1rem 0;border-bottom:1px solid var(--line);position:sticky;top:0;
+  background:rgba(7,11,20,.92);backdrop-filter:blur(10px);z-index:5}
+.brand{display:flex;align-items:center;gap:.65rem;color:var(--text);font-weight:750;letter-spacing:-.02em}
+.logo{width:34px;height:34px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#5eead4,#0f766e 55%,#042f2e);
+  box-shadow:0 0 0 2px #1e2a42}
+.nav{display:flex;gap:1rem;font-size:.9rem;color:var(--muted)}
+.nav a{color:var(--muted)}.nav a:hover{color:var(--text)}
+h1{font-size:1.45rem;letter-spacing:-.03em;margin:.2rem 0 .75rem;font-weight:800}
+h2{font-size:1.05rem;margin:1.4rem 0 .7rem;font-weight:700}
+.muted{color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.84rem;word-break:break-all}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin:1rem 0 1.25rem}
+@media(max-width:800px){.stats{grid-template-columns:1fr 1fr}}
+.stat{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:14px;padding:.95rem 1rem}
+.stat .l{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.stat .v{font-size:1.35rem;font-weight:800;margin-top:.25rem;letter-spacing:-.02em}
+.stat .s{color:var(--muted);font-size:.8rem;margin-top:.2rem}
+.search{display:flex;gap:.5rem;margin:1rem 0 1.25rem}
+.search input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:.7rem .9rem;font-size:.95rem}
+.search input:focus{outline:1px solid var(--accent);border-color:var(--accent)}
+.search button{background:var(--accent);color:#042f2e;border:0;border-radius:10px;
+  padding:.7rem 1.1rem;font-weight:750;cursor:pointer}
+.search button:hover{background:#5eead4}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:1rem}
+.card-h{padding:.85rem 1rem;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.card-h h2{margin:0;font-size:.95rem}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:.72rem .95rem;border-bottom:1px solid var(--line);vertical-align:middle}
+th{color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;background:rgba(0,0,0,.2);font-weight:700}
+tr:hover td{background:var(--rowh)}
+tr:last-child td,tr:last-child th{border-bottom:0}
+.kv th{width:28%;background:transparent;text-transform:none;letter-spacing:0;font-size:.88rem;color:var(--muted);font-weight:600}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.72rem;font-weight:750;
+  background:rgba(45,212,191,.12);color:var(--accent)}
+.badge-gold{background:rgba(226,184,74,.14);color:var(--gold)}
+.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);color:#fecaca;
+  padding:1rem;border-radius:12px;margin:1rem 0}
+.note{background:rgba(45,212,191,.08);border:1px solid rgba(45,212,191,.22);color:#b7f5eb;
+  padding:1rem;border-radius:12px;margin:1rem 0;font-size:.92rem}
+.crumbs{color:var(--muted);font-size:.88rem;margin-bottom:.6rem}
+.crumbs a{color:var(--muted)}.crumbs a:hover{color:var(--accent)}
+.pager{display:flex;gap:.75rem;padding:.85rem 1rem;border-top:1px solid var(--line);font-size:.9rem}
+footer{margin-top:1.5rem;color:var(--muted);font-size:.82rem;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+ul.tx{list-style:none;padding:.3rem 0}
+ul.tx li{padding:.55rem .95rem;border-bottom:1px solid var(--line)}
+ul.tx li:last-child{border-bottom:0}
 """
 
 
 def layout(title: str, body: str) -> bytes:
     html = f"""<!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>{esc(title)} · EGA Explorer</title>
 <style>{CSS}</style>
-</head><body><div class="wrap">
-<header>
-  <a class="brand" href="/"><span class="dot"></span> EGA Explorer</a>
-  <span class="muted mono"><a href="/">Home</a></span>
-</header>
-{body}
-<footer>Egalitarianism block explorer · connected to local node</footer>
-</div></body></html>"""
+</head><body>
+<div class="shell">
+  <header class="top">
+    <a class="brand" href="/"><span class="logo"></span> EGA Explorer</a>
+    <nav class="nav">
+      <a href="/">Blocks</a>
+      <a href="https://egalitarianism-ega.github.io/ega-website/" target="_blank" rel="noopener">Website</a>
+    </nav>
+  </header>
+  {body}
+  <footer>
+    <span>Egalitarianism block explorer</span>
+    <span class="mono">RPC · local node</span>
+  </footer>
+</div>
+</body></html>"""
     return html.encode()
 
 
@@ -162,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
         path = u.path.rstrip("/") or "/"
         q = parse_qs(u.query)
         if path == "/":
-            self.send_html(200, layout("Home", self._home()))
+            self.send_html(200, layout("Blocks", self._home()))
         elif path.startswith("/block/"):
             self.send_html(200, layout("Block", self._block(path[len("/block/") :])))
         elif path.startswith("/tx/"):
@@ -170,47 +212,57 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/search":
             self.send_html(200, layout("Search", self._search((q.get("q") or [""])[0].strip())))
         else:
-            self.send_html(404, layout("Not found", "<p>Not found.</p>"))
+            self.send_html(404, layout("Not found", '<div class="err">Page not found.</div>'))
+
+    def _search_form(self, value: str = "") -> str:
+        return f"""
+<form class="search" action="/search" method="get">
+  <input type="text" name="q" value="{esc(value)}" placeholder="Search by height, block hash, or transaction id" />
+  <button type="submit">Search</button>
+</form>"""
 
     def _home(self) -> str:
         info = rpc("getblockchaininfo")
         height = int(info.get("blocks", 0))
         diffs = info.get("difficulties") or {}
-        diff_s = ", ".join(f"{k}={v}" for k, v in list(diffs.items())[:3]) if diffs else info.get("difficulty", "")
+        diff_bits = " · ".join(f"{k.split('-')[0]} {float(v):.3g}" for k, v in list(diffs.items())[:3]) if diffs else "—"
         rows = []
-        for h in range(height, max(-1, height - 19), -1):
+        for h in range(height, max(-1, height - 24), -1):
             try:
                 bh = rpc("getblockhash", [h])
                 b = rpc("getblock", [bh])
             except Exception:
                 continue
-            ntx = len(b.get("tx", []))
             algo = b.get("pow_algo") or b.get("algo") or "—"
+            ntx = len(b.get("tx", []))
             rows.append(
-                f'<tr><td><a href="/block/{h}">{h}</a></td>'
-                f'<td class="mono"><a href="/block/{esc(bh)}">{esc(bh[:18])}…</a></td>'
-                f"<td>{esc(algo)}</td><td>{ntx}</td><td>{b.get('time','')}</td></tr>"
+                f"""<tr>
+                <td><a href="/block/{h}"><strong>{h}</strong></a></td>
+                <td class="mono"><a href="/block/{esc(bh)}">{esc(short(bh, 8))}</a></td>
+                <td><span class="badge">{esc(algo)}</span></td>
+                <td>{ntx}</td>
+                <td class="muted">{esc(fmt_time(b.get('time')))}</td>
+                </tr>"""
             )
-        table = (
-            "<table><tr><th>Height</th><th>Hash</th><th>Algo</th><th>Txs</th><th>Time</th></tr>"
-            + "".join(rows)
-            + "</table>"
-        )
         return f"""
-<h1>Chain overview</h1>
-<div class="cards">
-  <div class="card"><div class="n">{esc(height)}</div><div class="l">Height</div></div>
-  <div class="card"><div class="n">{esc(info.get("headers",""))}</div><div class="l">Headers</div></div>
-  <div class="card"><div class="n" style="font-size:.95rem">{esc(info.get("chain",""))}</div><div class="l">Network</div></div>
-  <div class="card"><div class="n" style="font-size:.72rem;word-break:break-all">{esc(diff_s or "—")}</div><div class="l">Difficulty</div></div>
+<h1>Blocks</h1>
+<p class="muted">Live view of the Egalitarianism chain from your node.</p>
+<div class="stats">
+  <div class="stat"><div class="l">Height</div><div class="v">{esc(height)}</div></div>
+  <div class="stat"><div class="l">Network</div><div class="v" style="font-size:1.05rem">{esc(info.get('chain','—'))}</div>
+    <div class="s">headers {esc(info.get('headers',''))}</div></div>
+  <div class="stat"><div class="l">Difficulty</div><div class="v" style="font-size:.82rem;line-height:1.35">{esc(diff_bits)}</div></div>
+  <div class="stat"><div class="l">Best block</div><div class="v mono" style="font-size:.78rem">{esc(short(info.get('bestblockhash',''), 6))}</div>
+    <div class="s mono">{esc(info.get('bestblockhash',''))}</div></div>
 </div>
-<form action="/search" method="get">
-  <input type="text" name="q" placeholder="Search height, block hash, or txid" />
-  <button type="submit">Search</button>
-</form>
-<p class="mono muted">Best block: {esc(info.get("bestblockhash",""))}</p>
-<h2>Recent blocks</h2>
-{table}
+{self._search_form()}
+<div class="card">
+  <div class="card-h"><h2>Recent blocks</h2><span class="muted">latest 25</span></div>
+  <table>
+    <tr><th>Height</th><th>Hash</th><th>Algo</th><th>Txs</th><th>Time</th></tr>
+    {''.join(rows) or '<tr><td colspan="5" class="muted">No blocks yet</td></tr>'}
+  </table>
+</div>
 """
 
     def _block(self, key: str) -> str:
@@ -221,68 +273,77 @@ class Handler(BaseHTTPRequestHandler):
         b = rpc("getblock", [bh])
         height = b.get("height")
         txs = b.get("tx", [])
+        algo = b.get("pow_algo") or b.get("algo") or "—"
         tx_items = []
         for i, t in enumerate(txs):
-            label = "coinbase (genesis)" if height == 0 and i == 0 else ("coinbase" if i == 0 else "tx")
-            # genesis coinbase cannot be fetched via getrawtransaction
             if height == 0 and i == 0:
                 tx_items.append(
-                    f'<li class="mono">{esc(t)} <span class="muted">— {label}; not a normal spendable tx</span></li>'
+                    f'<li class="mono">{esc(t)} <span class="badge badge-gold">genesis coinbase</span></li>'
+                )
+            elif i == 0:
+                tx_items.append(
+                    f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a> <span class="badge">coinbase</span></li>'
                 )
             else:
-                tx_items.append(
-                    f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a> <span class="muted">({label})</span></li>'
-                )
+                tx_items.append(f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a></li>')
+
         fields = [
-            ("Height", height),
             ("Hash", b.get("hash")),
             ("Previous", b.get("previousblockhash")),
             ("Next", b.get("nextblockhash")),
-            ("Time", b.get("time")),
-            ("Algo", b.get("pow_algo") or b.get("algo") or "—"),
+            ("Merkle root", b.get("merkleroot")),
+            ("Time", fmt_time(b.get("time"))),
+            ("Algo", algo),
             ("Difficulty", b.get("difficulty")),
             ("Nonce", b.get("nonce")),
             ("Bits", b.get("bits")),
-            ("Merkle root", b.get("merkleroot")),
-            ("Size", b.get("size")),
+            ("Size", f"{b.get('size', '—')} bytes"),
             ("Version", b.get("version")),
         ]
         rows = "".join(
             f"<tr><th>{esc(k)}</th><td class='mono'>{esc('' if v is None else v)}</td></tr>"
             for k, v in fields
         )
-        nav = []
-        if b.get("previousblockhash"):
-            nav.append(f'<a href="/block/{esc(b["previousblockhash"])}">← previous</a>')
-        if height is not None:
-            nav.append(f"height {height}")
-        if b.get("nextblockhash"):
-            nav.append(f'<a href="/block/{esc(b["nextblockhash"])}">next →</a>')
+        prev = b.get("previousblockhash")
+        nxt = b.get("nextblockhash")
+        pager = []
+        if prev is not None:
+            pager.append(f'<a href="/block/{esc(prev)}">← Previous</a>')
+        if nxt:
+            pager.append(f'<a href="/block/{esc(nxt)}">Next →</a>')
         return f"""
-<h1>Block {esc(height if height is not None else '')}</h1>
-<p class="muted">{' · '.join(nav)}</p>
-<table>{rows}</table>
-<h2>Transactions ({len(txs)})</h2>
-<ul>{''.join(tx_items) or '<li>none</li>'}</ul>
+<div class="crumbs"><a href="/">Blocks</a> / Block {esc(height)}</div>
+<h1>Block {esc(height)}</h1>
+<p><span class="badge">{esc(algo)}</span> <span class="muted">{esc(fmt_time(b.get('time')))} · {len(txs)} transaction(s)</span></p>
+{self._search_form()}
+<div class="card">
+  <div class="card-h"><h2>Details</h2></div>
+  <table class="kv">{rows}</table>
+  <div class="pager">{' · '.join(pager) if pager else '<span class="muted">—</span>'}</div>
+</div>
+<div class="card">
+  <div class="card-h"><h2>Transactions</h2><span class="muted">{len(txs)}</span></div>
+  <ul class="tx">{''.join(tx_items) or '<li class="muted">None</li>'}</ul>
+</div>
 """
 
     def _tx(self, txid: str) -> str:
-        # Genesis coinbase special-case
         try:
             genesis = rpc("getblockhash", [0])
             gblock = rpc("getblock", [genesis])
             if gblock.get("tx") and gblock["tx"][0] == txid:
                 return f"""
+<div class="crumbs"><a href="/">Blocks</a> / <a href="/block/0">Genesis</a> / Tx</div>
 <h1>Genesis coinbase</h1>
 <div class="note">
-  The genesis block coinbase is not a normal transaction. Bitcoin-family nodes refuse
-  <code>getrawtransaction</code> for it (RPC -5). It is not spendable and has no standard vin/vout view.
+  The genesis coinbase is not a normal spendable transaction. Nodes reject
+  <code>getrawtransaction</code> for it (same as Bitcoin).
 </div>
-<table>
+<div class="card"><table class="kv">
 <tr><th>Txid</th><td class="mono">{esc(txid)}</td></tr>
-<tr><th>Block</th><td class="mono"><a href="/block/0">Genesis (height 0)</a></td></tr>
-<tr><th>Hash</th><td class="mono">{esc(genesis)}</td></tr>
-</table>
+<tr><th>Block</th><td><a href="/block/0">Genesis · height 0</a></td></tr>
+<tr><th>Block hash</th><td class="mono">{esc(genesis)}</td></tr>
+</table></div>
 """
         except Exception:
             pass
@@ -294,8 +355,8 @@ class Handler(BaseHTTPRequestHandler):
             hint = ""
             if "genesis" in msg.lower() or "coinbase is not considered" in msg.lower():
                 hint = "<div class='note'>Genesis coinbase cannot be loaded as a normal transaction.</div>"
-            elif "No such mempool" in msg or "No such" in msg or "-5" in msg:
-                hint = "<div class='note'>Enable <code>txindex=1</code> in <code>~/.ega/ega.conf</code> and restart the node (reindex if the chain already existed without it).</div>"
+            elif "No such" in msg or "-5" in msg:
+                hint = "<div class='note'>Enable <code>txindex=1</code> in <code>~/.ega/ega.conf</code> and restart (reindex if needed).</div>"
             return f'<div class="err">Could not load transaction: {esc(msg)}</div>{hint}'
 
         vins = tx.get("vin", [])
@@ -303,34 +364,43 @@ class Handler(BaseHTTPRequestHandler):
         vin_html = []
         for v in vins:
             if "coinbase" in v:
-                vin_html.append(f"<li class='mono'>coinbase {esc(str(v.get('coinbase',''))[:32])}…</li>")
+                vin_html.append(f"<li class='mono'>coinbase <span class='muted'>{esc(str(v.get('coinbase',''))[:40])}…</span></li>")
             else:
                 vin_html.append(
-                    f"<li class='mono'><a href='/tx/{esc(v.get('txid',''))}'>{esc(v.get('txid',''))}</a>:{v.get('vout','')}</li>"
+                    f"<li class='mono'><a href='/tx/{esc(v.get('txid',''))}'>{esc(short(v.get('txid','')))}</a>:{v.get('vout','')}</li>"
                 )
         vout_html = []
         for o in vouts:
             spk = o.get("scriptPubKey") or {}
             addrs = spk.get("addresses") or ([spk["address"]] if spk.get("address") else [])
+            dest = ", ".join(addrs) if addrs else spk.get("type", "—")
             vout_html.append(
-                f"<li>{esc(o.get('value',''))} EGA → <span class='mono'>{esc(', '.join(addrs) if addrs else spk.get('type',''))}</span></li>"
+                f"<li><strong>{esc(o.get('value',''))}</strong> EGA → <span class='mono'>{esc(dest)}</span></li>"
             )
         return f"""
+<div class="crumbs"><a href="/">Blocks</a> / Transaction</div>
 <h1>Transaction</h1>
-<table>
+{self._search_form(txid)}
+<div class="card"><table class="kv">
 <tr><th>Txid</th><td class="mono">{esc(tx.get("txid", txid))}</td></tr>
 <tr><th>Block</th><td class="mono"><a href="/block/{esc(tx.get('blockhash',''))}">{esc(tx.get('blockhash',''))}</a></td></tr>
 <tr><th>Confirmations</th><td>{esc(tx.get('confirmations',''))}</td></tr>
-<tr><th>Time</th><td>{esc(tx.get('time') or tx.get('blocktime') or '')}</td></tr>
-<tr><th>Size</th><td>{esc(tx.get('size',''))}</td></tr>
-</table>
-<h2>Inputs</h2><ul>{''.join(vin_html)}</ul>
-<h2>Outputs</h2><ul>{''.join(vout_html)}</ul>
+<tr><th>Time</th><td>{esc(fmt_time(tx.get('time') or tx.get('blocktime')))}</td></tr>
+<tr><th>Size</th><td>{esc(tx.get('size',''))} bytes</td></tr>
+</table></div>
+<div class="card">
+  <div class="card-h"><h2>Inputs</h2></div>
+  <ul class="tx">{''.join(vin_html) or '<li class="muted">—</li>'}</ul>
+</div>
+<div class="card">
+  <div class="card-h"><h2>Outputs</h2></div>
+  <ul class="tx">{''.join(vout_html) or '<li class="muted">—</li>'}</ul>
+</div>
 """
 
     def _search(self, term: str) -> str:
         if not term:
-            return "<p class='muted'>Empty search.</p>"
+            return f"<h1>Search</h1>{self._search_form()}<p class='muted'>Enter a height, block hash, or txid.</p>"
         if re.fullmatch(r"\d+", term):
             return self._block(term)
         if re.fullmatch(r"[0-9a-fA-F]{64}", term):
@@ -339,7 +409,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._block(term)
             except Exception:
                 return self._tx(term)
-        return f'<div class="err">Unrecognized query: {esc(term)}</div>'
+        return f"{self._search_form(term)}<div class='err'>Unrecognized query. Use height, 64-char block hash, or txid.</div>"
 
 
 def main():
@@ -351,7 +421,6 @@ def main():
         info = rpc("getblockchaininfo")
     except Exception as e:
         print(f"Cannot reach egad at {RPC_URL}: {e}", file=sys.stderr)
-        print("Start the node: bash scripts/easy-start.sh", file=sys.stderr)
         sys.exit(1)
     print(f"Connected chain={info.get('chain')} height={info.get('blocks')}")
     print(f"Explorer http://{HOST}:{PORT}/")
