@@ -45,3 +45,16 @@ Website: https://egalitarianism-ega.github.io/ega-website/
 | YespowerEGA | `easy-mine.sh yespower-ega` |
 | Verthash | GPU: [ega-verthash-miner](https://github.com/Egalitarianism-EGA/ega-verthash-miner) |
 | Scrypt | `easy-mine.sh scrypt` |
+
+## Always-on public seed (Oracle free ARM)
+
+Cheap Ampere A1 (2 OCPU / 12 GB) is enough for a **seed node** (not mining farm):
+
+- Guide: [`ORACLE-ARM-SEED.md`](./ORACLE-ARM-SEED.md)
+- Helper: `bash scripts/setup-seed-node.sh [peer_ip]`
+
+## Gentle multi-algo keep-alive (home PC)
+
+```bash
+bash scripts/low-power-mine.sh all 600   # 1 block / 10 min, rotates all 4
+```

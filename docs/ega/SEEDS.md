@@ -1,33 +1,50 @@
 # Seed nodes & public services
 
-## Published (operator PC — early network)
+## Home operator (early)
 
 | Service | Endpoint | Notes |
 |---------|----------|-------|
-| P2P seed | `105.225.100.58:20201` | `addnode=105.225.100.58:20201` |
-| Explorer | `http://105.225.100.58:8088/` | Forward TCP **8088** |
-| Pool Verthash | `stratum+tcp://105.225.100.58:3334` | GPU; Miningcore share-verify |
-| Pool Scrypt | `stratum+tcp://105.225.100.58:3336` | Miningcore share-verify |
-| Pool API | `http://105.225.100.58:4000/api/pools` | Forward TCP **4000** if public |
+| P2P | `105.225.100.58:20201` | Home PC — port-forward if public |
+| Explorer | `http://105.225.100.58:8088/` | TCP **8088** |
+| Pool Verthash | `stratum+tcp://105.225.100.58:3334` | GPU share-verify |
+| Pool Scrypt | `stratum+tcp://105.225.100.58:3336` | share-verify |
+| Pool API | `http://105.225.100.58:4000/api/pools` | optional |
 
-RandomX / YespowerEGA: **solo** on the node (not stock Miningcore).
+**RandomX / YespowerEGA:** solo only (`easy-mine` / `low-power-mine`) — not stock Miningcore.
 
-## Port-forward checklist
+## Oracle Ampere A1 (ARM) — recommended always-on seed
+
+See full guide: **[ORACLE-ARM-SEED.md](./ORACLE-ARM-SEED.md)**
+
+| Item | Value |
+|------|--------|
+| Shape | VM.Standard.A1.Flex, 2 OCPU / 8–12 GB, aarch64 |
+| Role | Public `egad` seed only (not heavy mining) |
+| Build | Native on Ubuntu ARM (`./configure && make`) |
+| Port | **TCP 20201** ingress |
+| `addnode` | `ORACLE_PUBLIC_IP:20201` (fill in when live) |
+
+| Host | Port | Notes |
+|------|------|-------|
+| *(add after you create the VM)* | 20201 | Always Free Ampere A1 |
+
+## Port-forward checklist (home)
 
 | Port | Service |
 |------|---------|
 | 20201 | P2P |
 | 8088 | Explorer |
-| 3334 | Verthash stratum |
-| 3336 | Scrypt stratum |
-| 4000 | Pool API (optional) |
-| **20202** | RPC — **do not** expose |
+| 3334 / 3336 | Pool VH / Scrypt |
+| 4000 | Pool API optional |
+| **20202** | **Never** public |
 
-## Operator start
+## Low-power home mining (all 4, gentle)
 
 ```bash
-bash scripts/easy-start.sh
-bash scripts/ega-explorer.sh          # or EGA_EXPLORER_HOST=0.0.0.0
-bash scripts/start-miningcore.sh
-bash scripts/start-gpu-verthash.sh    # RTX Verthash 24/7
+# ~1 block every 10 minutes, rotates RX → YP → Scrypt → Verthash (CPU path)
+bash scripts/low-power-mine.sh all 600
+# log: /tmp/ega-low-power-mine.log
+# stop: kill $(cat /tmp/ega-low-power-mine.pid)
 ```
+
+GPU Verthash when you want hashrate: `bash scripts/start-gpu-verthash.sh` (heavier).
