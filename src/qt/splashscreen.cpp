@@ -19,6 +19,11 @@
 #include <ui_interface.h>
 #include <version.h>
 
+#include <boost/bind/bind.hpp>
+using boost::placeholders::_1;
+using boost::placeholders::_2;
+using boost::placeholders::_3;
+
 #include <QApplication>
 #include <QCloseEvent>
 #include <QDesktopWidget>

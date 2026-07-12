@@ -21,6 +21,13 @@
 #include <wallet/coincontrol.h>
 #include <wallet/wallet.h>
 
+#include <boost/bind/bind.hpp>
+using boost::placeholders::_1;
+using boost::placeholders::_2;
+using boost::placeholders::_3;
+using boost::placeholders::_4;
+using boost::placeholders::_5;
+
 #include <stdint.h>
 
 #include <QDebug>
