@@ -470,7 +470,7 @@ class Handler(BaseHTTPRequestHandler):
 
         return f"""
 <h1>Network overview</h1>
-<p class="muted">Live chain data from your node · MultiShield triple PoW</p>
+<p class="muted">Live chain data from your node · MultiShield-4 PoW</p>
 
 <div class="stats">
   <div class="stat">
