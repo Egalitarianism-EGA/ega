@@ -111,6 +111,10 @@ DONE:
   [x] Multi-page website (whitepaper/start/mine/explorer/pool on-site)
   [x] Lightweight explorer: scripts/ega-explorer.py (local :8088)
   [x] Pool stack scaffold: scripts/start-pool-stack.sh (Postgres + config)
+  [x] Live pool dashboard + stratum: scripts/ega-pool.sh (:8089 / :3333)
+  [x] Explorer genesis tx fix + dark UI
+  [x] Prebuilt release script + GitHub Release v0.1.0
+  [x] Website: user-facing branded multipage
 
 NOT DONE / NEXT:
   [ ] Confirm CI green on latest main
