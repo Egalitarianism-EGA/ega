@@ -24,7 +24,7 @@ Short name / ticker: **EGA**.
 ## 2. Design principles
 
 1. **Fair launch** — no premine; genesis coinbase value is zero.  
-2. **Multi-door mining** — three algorithms, three hardware “doors.”  
+2. **Multi-door mining** — four algorithms, four hardware “doors” (MultiShield-4).  
 3. **Simple emission** — Bitcoin-style halvings, transparent math.  
 4. **Independence of difficulty** — MultiShield-style per-algo adjustment so one algo’s hashrate does not freeze the others.  
 5. **Honesty** — farms can still outspend individuals; the design raises the bar for monopoly, it does not magically erase capital.
@@ -87,6 +87,7 @@ Development funding, if any, is **off-chain** (donations, voluntary tips)—not 
 | **RandomX** | Modern CPUs, capable phones/PCs | CPU path |
 | **Verthash** | Consumer GPUs | GPU path |
 | **YespowerEGA** | Low-RAM / older devices | Inclusive CPU path |
+| **Scrypt** | ASIC / capital market | MultiShield security hard door |
 
 **YespowerEGA** parameters: YESPOWER 1.0, **N=2048**, **r=32**, personalization string **`YespowerEGA`**.
 
@@ -96,7 +97,7 @@ Development funding, if any, is **off-chain** (donations, voluntary tips)—not 
 
 ### Difficulty
 
-**MultiShield-style** (DigiByte V4 family): independent difficulty per algorithm, with global timing pressure so overall block time stays near 60s and shares trend toward balance across algos.
+**MultiShield-style** (DigiByte V4 family): independent difficulty per algorithm, with global timing pressure so overall block time stays near 60s and shares trend toward ~25% each across four algos.
 
 ### Network identity
 
@@ -128,7 +129,7 @@ Source: https://github.com/Egalitarianism-EGA/ega
 
 ### Phase A — Live chain (now → weeks)
 
-- [x] Consensus + triple PoW + genesis  
+- [x] Consensus + MultiShield-4 PoW + genesis  
 - [x] Solo mining (CPU + GPU Verthash path)  
 - [ ] Green CI  
 - [ ] 24/7 seed node(s)  

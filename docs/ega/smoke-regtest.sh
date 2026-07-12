@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EGA Phase 6 smoke: regtest start, genesis, three algos listed.
+# EGA smoke: regtest start, genesis, MultiShield-4 algos listed.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BIN="${EGA_BIN_DIR:-$ROOT/src}"
@@ -16,11 +16,12 @@ sleep 2
 
 GENESIS="$("$BIN/ega-cli" -regtest -datadir="$DATADIR" getblockhash 0)"
 echo "genesis: $GENESIS"
-test "$GENESIS" = "7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0"
+test "$GENESIS" = "beeed73f369163a394f73c5d69c368cc3d01b07ad0f0af42b9cb8ec429cf3a71"
 
 INFO="$("$BIN/ega-cli" -regtest -datadir="$DATADIR" getblockchaininfo)"
 echo "$INFO" | grep -q randomx
 echo "$INFO" | grep -q verthash
 echo "$INFO" | grep -q yespower-ega
+echo "$INFO" | grep -q scrypt
 
-echo "OK: genesis + triple-algo difficulties present"
+echo "OK: genesis + MultiShield-4 difficulties present"

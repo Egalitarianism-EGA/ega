@@ -51,7 +51,7 @@ Spins two regtest nodes, connects them, mines on both (RandomX + YespowerEGA), c
 
 ## GPU + CPU on same network
 
-- CPU operators: RandomX / YespowerEGA via CLI or Miner app.  
+- CPU operators: RandomX / YespowerEGA / Scrypt via CLI or Miner app.  
 - GPU operators: VerthashMiner → GBT on their own `egad` (or later a pool).  
 - All `egad` instances with `addnode` to each other form **one** Egalitarianism network.
 

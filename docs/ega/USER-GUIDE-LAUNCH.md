@@ -1,6 +1,6 @@
 # EGA — Run a node and mine (launch guide)
 
-For operators who want to **run a full node** and **mine** with RandomX, Verthash, or YespowerEGA.
+For operators who want to **run a full node** and **mine** with RandomX, Verthash, YespowerEGA, or Scrypt.
 
 ## 1. Build (Linux)
 
@@ -79,6 +79,9 @@ ADDR=$(./src/ega-cli getnewaddress)
 
 # Old phones / low-RAM Pi — YespowerEGA
 ./src/ega-cli generatetoaddress 1 "$ADDR" 10000000 yespower-ega
+
+# Scrypt — MultiShield hard door
+./src/ega-cli generatetoaddress 1 "$ADDR" 10000000 scrypt
 ```
 
 Check:
@@ -126,6 +129,7 @@ When the network is busy with peers, you can set `gbtrequirepeers=1` in `ega.con
 | RandomX | `randomx`, `rx` |
 | Verthash | `verthash`, `vert`, `vtc` |
 | YespowerEGA | `yespower-ega`, `yespower`, `yp`, `yespowerega` |
+| Scrypt | `scrypt` |
 
 Default: `-algo=randomx`
 

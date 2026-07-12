@@ -5,7 +5,7 @@
 ### 1) Solo mining (easiest)
 - You run a node and mine.
 - When **you** find a block, **you** get the 50,000 EGA (minus maturity wait).
-- Scripts: `scripts/easy-mine.sh randomx`
+- Scripts: `scripts/easy-mine.sh randomx (also yespower-ega, scrypt)`
 
 ### 2) Shared **network** (still solo rewards)
 - Friends run nodes and connect to you (`addnode=`).
@@ -57,7 +57,7 @@ If a group trusts one address:
 
 ```bash
 # everyone uses the SAME address
-ega-cli generatetoaddress 1 SHARED_ADDRESS 10000000 randomx
+ega-cli generatetoaddress 1 SHARED_ADDRESS 10000000 randomx (also yespower-ega, scrypt)
 ```
 
 Then someone has to split coins manually — fragile. Prefer solo or a real pool.

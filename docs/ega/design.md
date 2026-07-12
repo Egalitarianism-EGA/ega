@@ -87,7 +87,7 @@ DigiByte already implements multi-algo difficulty in `src/pow.cpp` (V1–V4). EG
 
 - **Per-algorithm difficulty** (independent `nBits` lineage per algo).
 - **Global** retarget using an averaging window so overall block time stays near **60s**.
-- **Local** per-algo adjustment so under-represented algos get easier work and over-represented get harder → tends toward **~⅓ / ⅓ / ⅓** share without forced strict alternation.
+- **Local** per-algo adjustment so under-represented algos get easier work and over-represented get harder → tends toward **~¼ / ¼ / ¼ / ¼** share without forced strict alternation.
 - **No historical activation ladder** (no “MultiShield at block 400k”). Dispatcher uses the MultiShield path from height 0 on mainnet.
 
 **Spacing sketch (Phase 1 constants; tune only if needed later)**
@@ -123,7 +123,7 @@ Full binary/datadir rename (`egad`, etc.) may wait for Phase 5 so consensus work
 Work **strictly** in dependency order. Do not freeze genesis early.
 
 ```
-Phase 1  Economic constants + 60s timing + MultiShield spacing for 3 algos
+Phase 1  Economic constants + 60s timing + MultiShield spacing for 4 algos
 Phase 2  Network identity (magic, ports, seeds, checkpoint reset)
 Phase 3  RandomX + Verthash + YespowerEGA + V4 MultiShield dispatcher
 Phase 4  Mine and freeze genesis (main/test/regtest as needed)
@@ -139,7 +139,7 @@ Phase 6  Tests and hardening
 - `src/validation.cpp`: `GetBlockSubsidy` → 50000 * COIN, halving every `nSubsidyHalvingInterval`.
 - `src/chainparams.cpp` (and base where needed):
   - `nSubsidyHalvingInterval = 210000`
-  - All relevant target spacings → **60** (and multi-algo spacing **180** for 3 algos)
+  - All relevant target spacings → **60** (and multi-algo spacing **240** for 4 algos)
   - Comments consistent with 21B / dual-no → **triple** algo
   - Premine 0 already intended; keep genesis reward 0
 - `docs/ega/params.md`: machine-readable freeze of numbers above
@@ -199,7 +199,7 @@ Phase 6  Tests and hardening
 | Emission | Bitcoin-style scaled (50k / 210k halvings) |
 | Block time | 60 seconds |
 | PoW count | 3 from genesis |
-| Algos | RandomX, Verthash, YespowerEGA |
+| Algos | RandomX, Verthash, YespowerEGA, Scrypt |
 | Difficulty | MultiShield V4-style from height 0 |
 | Launch | Fair, 0 premine |
 | Delivery order | Foundation layers (this doc §6) |

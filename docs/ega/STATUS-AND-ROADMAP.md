@@ -18,12 +18,12 @@
 | Area | Status |
 |------|--------|
 | Consensus params (21B, 8 decimals, 50k/210k, 60s, 0 premine) | **Done** |
-| Triple PoW: RandomX, Verthash, YespowerEGA | **Done** |
+| MultiShield-4: RandomX, Verthash, YespowerEGA, Scrypt | **Done** |
 | MultiShield difficulty | **Done** |
 | Genesis freeze (main/test/regtest) | **Done** |
 | Network identity (ports, magic, bech32 `ega`, `~/.ega`) | **Done** |
 | Binaries `egad` / `ega-cli` / `ega-tx` / `ega-qt` | **Built locally** |
-| Wallet RPC + solo mine all 3 algos | **Verified** |
+| Wallet RPC + solo mine all 4 algos | **Verified** |
 | GPU Verthash (OpenCL, your RTX) | **Verified ~0.9 MH/s** |
 | Logos + docs under `docs/ega/` | **Done** |
 | GitHub org repos | **Live** (see below) |
@@ -80,6 +80,7 @@
 |------|-----------|-----------|
 | **RandomX** | CPU (Ryzen etc.) | `ega-cli generatetoaddress 1 $ADDR 10000000 randomx` |
 | **YespowerEGA** | CPU / phones / Pi | same with `yespower-ega` |
+| **Scrypt** | ASIC / capital market | `… scrypt` |
 | **Verthash** | GPU | **VerthashMiner** + EGA dataset + GBT (see ega-verthash-miner) |
 
 There is **no** bundled third-party “download installer miner” for RandomX/Yespower yet — use:
@@ -162,7 +163,7 @@ Already decided technically — document as **Egalitarianism**:
 - Block **50,000 EGA**, halve every **210,000** blocks  
 - Block time **~60s**  
 - **0 premine**, fair launch  
-- PoW: RandomX + Verthash + YespowerEGA, MultiShield  
+- PoW: RandomX + Verthash + YespowerEGA + Scrypt (MultiShield-4)  
 - Vision: anyone can mine (CPU / GPU / low-end)  
 
 Still to write as narrative: why multi-algo, emission chart, no VC allocation, risk disclaimer, roadmap timeline.
@@ -176,7 +177,7 @@ Still to write as narrative: why multi-algo, emission chart, no VC allocation, r
 | CI red? | **Deprecated cache action** — fixed in workflow update |
 | Blockchain core ready to run/mine? | **Yes** |
 | Full global network product? | **Not yet** — needs seeds, peers, optional explorer/pool |
-| Miners ready? | **Solo CLI all 3 algos + GPU Verthash**; pool not fully deployed |
+| Miners ready? | **Solo CLI all 4 algos + GPU Verthash**; pool not fully deployed |
 | Host free on your PC? | **Yes** for node + mining + optional tunnel; explorer/pool heavier but doable |
 | Whitepaper? | **Should do** — next doc deliverable |
 

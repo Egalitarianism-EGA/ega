@@ -7,7 +7,7 @@ Anyone can:
 1. Build or install the node (Linux first; Windows path documented)
 2. Start a node with `ega.conf`
 3. Create an address (wallet)
-4. Mine with **RandomX**, **Verthash**, or **YespowerEGA**
+4. Mine with **RandomX**, **Verthash**, **YespowerEGA**, or **Scrypt**
 5. Connect to peers once seeds/IPs exist
 
 ## Ship now (MVP)
@@ -17,7 +17,7 @@ Anyone can:
 | Consensus params + genesis | **Done** |
 | Triple PoW + MultiShield | **Done** |
 | Wallet Linux build (`--enable-wallet --with-incompatible-bdb`) | **Done** (verified) |
-| Solo mine all 3 algos (`generatetoaddress`) | **Done** (regtest verified) |
+| Solo mine all 4 algos (`generatetoaddress`) | **Done** (regtest verified) |
 | `getblocktemplate` solo without peers / IBD block | **Done** |
 | Launch user guide | **Done** → [USER-GUIDE-LAUNCH.md](USER-GUIDE-LAUNCH.md) |
 | Example conf + wrappers | **Done** |

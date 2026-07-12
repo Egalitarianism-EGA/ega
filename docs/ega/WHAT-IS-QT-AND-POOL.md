@@ -49,7 +49,7 @@ A **coin profile** (also called coin config / coin definition) is a small config
 | Explorer link | (when you have one) |
 | Payout address | pool wallet |
 
-Many pools run **one profile per algo** (3 stratum ports for EGA’s three algos).
+Many pools run **one profile per algo** (4 stratum ports for MultiShield-4).
 
 You don’t invent that from Core — you **fork Miningcore / NOMP / Yiimp** and add an `ega.json` (or similar) profile. See `ECOSYSTEM.md`.
 
@@ -61,7 +61,7 @@ You don’t invent that from Core — you **fork Miningcore / NOMP / Yiimp** and
 |-----------|--------|--------|
 | **GUI** | Already in this repo (`src/qt/`) | Rebuild as `ega-qt`, logos already partly applied |
 | **Explorer** | Fork **Blockbook** or Insight | New coin def + logos + RPC to egad |
-| **Pool** | Fork **Miningcore** or NOMP | Coin profile(s) + 3 algos |
+| **Pool** | Fork **Miningcore** or NOMP | Coin profile(s) + 4 algos |
 
 DigiByte Core is the **node**; explorer/pool are **other projects** that sit next to it.
 
@@ -73,5 +73,5 @@ DigiByte Core is the **node**; explorer/pool are **other projects** that sit nex
 - **Verthash** → designed for **GPU**; in *this* node, `generatetoaddress … verthash` still runs the Verthash **hash on CPU** (works for testing; a real GPU miner is a separate binary that uses the GPU and submits via GBT/stratum)
 
 So:
-- CLI can fully test all three algos for **correctness**
+- CLI can fully test all four algos for **correctness**
 - **GPU hashrate** for Verthash needs a GPU Verthash miner + pool or GBT later

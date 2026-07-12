@@ -33,13 +33,24 @@ Chain is still tiny — a clean reset + param change is still possible before a 
 | **E. Hybrid: KawPow + one CPU (RandomX or yespower) only** | Closer to “two expensive doors” | Smaller multi-algo set |
 | **F. DigiByte-like expensive mix** | Strongest 51% story | Needs SHA-256/scrypt (or similar) support + farms |
 
+## Implemented: MultiShield-4 (current)
+
+| Algo | Role |
+|------|------|
+| RandomX | People CPU |
+| Verthash | People GPU |
+| YespowerEGA | Inclusion (soft door; MultiShield caps ~25%) |
+| **Scrypt** | Security hard door (capital market) |
+
+Economy unchanged: 60s · 50k / 210k halvings · 21B · 0 premine. Same subsidy for every algo.
+
 ## Recommendation for launch honesty
 
 - Treat multi-algo as **participation + gradual balance**, not “un-51%-able.”
-- Publish **per-algo difficulty and hashrate on the explorer** so nobody is fooled by vanity hashrate.
-- If security > inclusion: plan a **pre-community hard fork** of the algo set (KawPow + one hard CPU, or DGB-style expensive mix) and reset the young chain.
-- If inclusion > security: keep the set, accept botnet risk, push for many independent nodes and social monitoring.
+- Publish **per-algo difficulty and hashrate on the explorer** (done: `ega-explorer.sh` / `/api/stats`).
+- Current set keeps the vision (three people doors) plus one hard door (Scrypt).
+- Further hardening (KawPow, extra DGB-like doors) remains optional later.
 
-## Not changing in this doc
+## Note
 
-Consensus params stay frozen unless the project explicitly chooses a reset/fork. This file is decision support, not a silent consensus change.
+This file started as decision support; MultiShield-4 + Scrypt is now consensus. Further algo changes need an explicit upgrade/reset.

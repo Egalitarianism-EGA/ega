@@ -10,7 +10,7 @@ Last updated: 2026-07-12
 ================================================================================
 - Fair-launch multi-algo PoW cryptocurrency (fork of DigiByte/Bitcoin Core).
 - Anyone can mine: CPU, GPU, phone/Pi — no premine.
-- Algorithms from genesis: RandomX + Verthash + YespowerEGA + Scrypt (MultiShield-4) (MultiShield).
+- Algorithms from genesis: RandomX + Verthash + YespowerEGA + Scrypt (MultiShield-4).
 - Block ~60s, subsidy 50,000 EGA, halve every 210,000 blocks, max 21B EGA, 8 decimals.
 
 ================================================================================
@@ -100,7 +100,7 @@ DONE:
   [x] Consensus + 3 PoW + MultiShield + genesis
   [x] Network identity, branding, logos (logo/)
   [x] Wallet RPC + ega-qt binary build
-  [x] Solo mining all 3 algos
+  [x] Solo mining all 4 algos (incl. Scrypt)
   [x] GPU Verthash path documented + tested
   [x] Org repos created and pushed
   [x] Whitepaper draft + roadmap docs
@@ -170,6 +170,9 @@ CPU RandomX:
 
 CPU YespowerEGA:
   ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 yespower-ega
+
+Scrypt (hard door):
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 scrypt
 
 GPU Verthash:
   # ega.conf: algo=verthash

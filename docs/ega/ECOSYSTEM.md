@@ -63,13 +63,14 @@ We can add a thin `ecosystem/explorer/` config template in a follow-up (coin.jso
 | **Yiimp** | PHP; multi-algo; heavier ops |
 | **Miningcore** | C#; modern; multi-algo |
 
-EGA needs **three** stratum ports or one portal with algo selection:
+EGA needs **four** stratum ports or one portal with algo selection:
 
 | Algo | Suggested stratum port (example) |
 |------|----------------------------------|
 | RandomX | 3333 |
 | Verthash | 3334 |
 | YespowerEGA | 3335 |
+| Scrypt | 3336 |
 
 Pool talks to `egad` via:
 
@@ -77,15 +78,16 @@ Pool talks to `egad` via:
 - `submitblock`  
 - wallet/RPC for payouts  
 
-Point each algo at EGA’s hash: RandomX (light/full), Verthash (EGA dataset), Yespower with personalization **`YespowerEGA`** (N=2048, r=32).
+Point each algo at EGA’s hash: RandomX (light/full), Verthash (EGA dataset), Yespower **`YespowerEGA`** (N=2048, r=32), Scrypt (1024/1/1).
 
 **Launch-day alternative (no pool yet):** users solo-mine with:
 
 ```bash
-ega-cli generatetoaddress 1 "$ADDR" 10000000 randomx   # or verthash / yespower-ega
+ega-cli generatetoaddress 1 "$ADDR" 10000000 randomx
+# also: verthash | yespower-ega | scrypt
 ```
 
-Pool can wait until there are hashrate and users.
+Also: lightweight explorer `bash scripts/ega-explorer.sh` and Miningcore `bash scripts/start-miningcore.sh`.
 
 ---
 
