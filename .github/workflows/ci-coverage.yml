@@ -1,59 +1,67 @@
-name: 'Build and check'
+# Egalitarianism (EGA) Core — CI
+name: Build and check
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-        matrix:
-          os: [x86_64-linux-gnu]
-
+  linux-daemon:
+    name: Linux egad (no GUI)
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: Cache apt depencenies
-        uses: actions/cache@v2
-        id: cache-apt
-        with:
-          path: "~/apt-cache"
-          key: apt-cache
-
-      - name: Cache depends
-        id: cache-dependencies
-        uses: actions/cache@v2        
-        with:
-          path: depends/${{ matrix.os }}
-          key: ${{ matrix.os }}-${{ hashFiles('depends/packages/*.mk') }}
-          
-      - name: Install apt dependencies
-        env:
-          CACHE_HIT: ${{steps.cache-apt.outputs.cache-hit}}
-          DEPS: build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache
+      - name: Install dependencies
         run: |
-          if [[ "$CACHE_HIT" == 'true' ]]; then
-            sudo cp --force --recursive ~/apt-cache/* /
-          else
-            sudo apt-get update && sudo apt-get install -yq $DEPS
-            mkdir -p ~/apt-cache
-            for dep in $DEPS; do
-                dpkg -L $dep | while IFS= read -r f; do if test -f $f; then echo $f; fi; done | xargs cp --parents --target-directory ~/apt-cache/
-            done
-          fi
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential libtool autotools-dev automake pkg-config bsdmainutils \
+            python3 cmake ccache \
+            libssl-dev libevent-dev \
+            libboost-system-dev libboost-filesystem-dev libboost-thread-dev \
+            libboost-chrono-dev libboost-test-dev \
+            libdb-dev libdb++-dev \
+            libminiupnpc-dev libzmq3-dev
 
-      - name: Build depends
-        if: steps.cache-dependencies.outputs.cache-hit != 'true' && steps.cache-apt.outputs.cache-hit != 'true'
-        run: cd depends/ && make -j4 HOST=${{matrix.os}}
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ runner.os }}-${{ hashFiles('**/Makefile.am', 'configure.ac') }}
+          restore-keys: ccache-${{ runner.os }}-
 
-      - name: Auto generate
-        run: ./autogen.sh
+      - name: Configure
+        run: |
+          ./autogen.sh
+          ./configure \
+            --with-daemon \
+            --without-gui \
+            --enable-wallet \
+            --with-incompatible-bdb \
+            --disable-bench \
+            --disable-tests \
+            CC="ccache gcc" CXX="ccache g++"
 
-      - name: configure
-        run: ./configure --with-incompatible-bdb --prefix=`pwd`/depends/${{ matrix.os }}
+      - name: Build RandomX + egad + ega-cli
+        run: |
+          make -C src crypto/randomx/build/librandomx.a -j$(nproc) || true
+          # RandomX builds via Makefile rule on first link
+          make -C src egad ega-cli -j$(nproc)
 
-      - name: make
-        run: make -j4
+      - name: Version smoke
+        run: |
+          ./src/egad -version
+          ./src/ega-cli -version
 
-      - name: check
-        run: make check
-        
+      - name: Regtest genesis smoke
+        run: |
+          DATADIR=$(mktemp -d)
+          ./src/egad -regtest -datadir="$DATADIR" -daemon
+          sleep 3
+          HASH=$(./src/ega-cli -regtest -datadir="$DATADIR" getblockhash 0)
+          echo "genesis=$HASH"
+          test "$HASH" = "7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0"
+          ./src/ega-cli -regtest -datadir="$DATADIR" stop

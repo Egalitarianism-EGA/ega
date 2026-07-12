@@ -115,6 +115,8 @@ MIT. See [COPYING](COPYING). Based on DigiByte / Bitcoin Core; EGA-specific work
 
 **Operator guide:** [docs/ega/USER-GUIDE-LAUNCH.md](docs/ega/USER-GUIDE-LAUNCH.md)  
 **Launch checklist:** [docs/ega/LAUNCH.md](docs/ega/LAUNCH.md)
+**Status & roadmap:** [docs/ega/STATUS-AND-ROADMAP.md](docs/ega/STATUS-AND-ROADMAP.md)  
+**Whitepaper (draft):** [docs/ega/WHITEPAPER.md](docs/ega/WHITEPAPER.md)
 
 Recommended configure for mining:
 
