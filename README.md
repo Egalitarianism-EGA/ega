@@ -86,6 +86,18 @@ Outputs: **`src/egad`**, **`src/ega-cli`**, **`src/ega-tx`** (and **`src/qt/ega-
 
 ## Running
 
+### Easiest path (Linux)
+
+```bash
+bash scripts/easy-install-linux.sh
+bash scripts/easy-start.sh
+bash scripts/easy-wallet.sh
+bash scripts/easy-mine.sh randomx
+```
+
+Plain English: [docs/ega/FOR-HUMANS.md](docs/ega/FOR-HUMANS.md) · Continuity file: [EGA-HANDOFF.txt](EGA-HANDOFF.txt)
+
+
 ```bash
 ./src/egad -daemon
 ./src/ega-cli getblockchaininfo

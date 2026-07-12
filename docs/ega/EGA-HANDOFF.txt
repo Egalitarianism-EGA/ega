@@ -1,0 +1,185 @@
+================================================================================
+EGALITARIANISM (EGA) — FULL PROJECT HANDOFF / CONTINUITY FILE
+================================================================================
+If this chat dies, open this file first. Full name: Egalitarianism. Ticker: EGA.
+Last updated: 2026-07-12 (session continuation)
+
+================================================================================
+1. WHAT THIS PROJECT IS
+================================================================================
+- Fair-launch multi-algo PoW cryptocurrency (fork of DigiByte/Bitcoin Core).
+- Vision: anyone can mine (CPU, GPU, phone/Pi) — no premine.
+- Algorithms from genesis: RandomX + Verthash + YespowerEGA (MultiShield difficulty).
+- Block ~60s, subsidy 50,000 EGA, halve every 210,000 blocks, max 21 billion EGA, 8 decimals.
+
+================================================================================
+2. GITHUB ORG (Egalitarianism-EGA)
+================================================================================
+Core node:        https://github.com/Egalitarianism-EGA/ega
+Wallet hub:       https://github.com/Egalitarianism-EGA/ega-wallet
+Miners hub:       https://github.com/Egalitarianism-EGA/ega-miners
+GPU Verthash:     https://github.com/Egalitarianism-EGA/ega-verthash-miner
+Pool configs:     https://github.com/Egalitarianism-EGA/ega-miningcore
+Explorer config:  https://github.com/Egalitarianism-EGA/ega-blockbook
+Home lab:         https://github.com/Egalitarianism-EGA/ega-homelab
+Website:          https://github.com/Egalitarianism-EGA/ega-website
+Pages URL:        https://egalitarianism-ega.github.io/ega-website/
+
+Local working tree (this machine): /home/daimondsteel259/ega
+Remote origin: Egalitarianism-EGA/ega (main)
+
+SECURITY: A GitHub PAT was used in chat history — REVOKE after work is fully done.
+Never commit tokens. Prefer gh auth or env GH_TOKEN only.
+
+================================================================================
+3. FROZEN MAINNET PARAMS (DO NOT CHANGE CASUALLY)
+================================================================================
+Max supply:           21_000_000_000 EGA
+Decimals:             8 (COIN = 100_000_000)
+Subsidy:              50_000 EGA / block
+Halving:              every 210_000 blocks
+Block time target:    60 seconds
+Premine:              0
+P2P / RPC:            20201 / 20202
+Magic:                e4 47 41 01
+bech32:               ega
+Data dir:             ~/.ega
+Config:               ~/.ega/ega.conf
+PID:                  egad.pid
+
+Genesis main:
+  time=1751846400 nonce=2816 nBits=0x1f0fffff nVersion=2 (RandomX)
+  hash=943c83429a935b34fb988508440ec8702d217525865f3eea7076d64b4592eda5
+  merkle=e30d15a8674c033ae2e00393f849b1d1bed85970b2aa7a5c6b843722020ddf01
+
+Genesis regtest hash=7db0bcedfac1596d0be2a5b42c4b88043c207f8f29bac2796fba10ea06ae5ac0
+Genesis test hash=86ec8743951d8dcfcc7c6aad05c8a4365108f96075bf4c995dfbca98ffde1c98
+
+YespowerEGA: N=2048 r=32 pers="YespowerEGA" YESPOWER_1_0
+Verthash dataset: tag EGA-Verthash-v1 size 256 MiB (NOT Vertcoin official dat)
+RandomX: light VM; seed tag EGA-RandomX; epoch nTime/(2048*60)
+
+powLimit main: ~0 >> 12 (compact 0x1f0fffff)
+GBT: peers/IBD not required by default (-gbtrequirepeers=0)
+
+Docs of truth:
+  docs/ega/params.md
+  docs/ega/design.md
+  docs/ega/WHITEPAPER.md
+  docs/ega/STATUS-AND-ROADMAP.md
+  docs/ega/REPOS.md
+  docs/ega/USER-GUIDE-LAUNCH.md
+
+================================================================================
+4. BINARIES (BUILT NAMES)
+================================================================================
+src/egad          — full node daemon
+src/ega-cli       — RPC client
+src/ega-tx        — tx util
+src/qt/ega-qt     — desktop GUI (needs Qt5 build)
+contrib/ega/*     — wrappers with digibyte* fallback
+
+Recommended configure:
+  ./configure --with-daemon --without-gui --enable-wallet --with-incompatible-bdb
+GUI:
+  ./configure --with-gui=qt5 --enable-wallet --with-incompatible-bdb
+
+cmake REQUIRED (RandomX under src/crypto/randomx/).
+
+Hardware proven on this PC:
+  CPU: AMD Ryzen 5 7600 — RandomX + YespowerEGA mainnet blocks mined
+  GPU: RTX 5060 Ti OpenCL — VerthashMiner ~900 kH/s, GBT solo regtest many blocks
+
+================================================================================
+5. WHAT IS DONE vs NOT DONE
+================================================================================
+DONE:
+  [x] Consensus + 3 PoW + MultiShield + genesis
+  [x] Network identity, branding, logos (logo/)
+  [x] Wallet RPC + ega-qt binary build
+  [x] Solo mining all 3 algos
+  [x] GPU Verthash path documented + tested
+  [x] Org repos created and pushed
+  [x] Whitepaper draft + roadmap docs
+  [x] CI workflow fixed (cache v4); verify green on Actions
+  [x] GitHub Pages site created for ega-website
+
+NOT DONE / NEXT:
+  [ ] Confirm CI green on latest main
+  [ ] 24/7 mainnet egad seed on owner PC
+  [ ] Public seed IPs / addnode list for others
+  [ ] Easy one-click Linux install script for non-builders (scripts/easy-*)
+  [ ] Prebuilt release tarball (egad, ega-cli, ega-qt) on GitHub Releases
+  [ ] Shared mining: deploy Miningcore OR simple multi-user guide (see ega-miners)
+  [ ] Live explorer (install Blockbook with ega-blockbook config)
+  [ ] Live stratum pool (install Miningcore with ega-miningcore config)
+  [ ] Windows release package
+  [ ] macOS (deferred)
+  [ ] Light/mobile wallet (optional later)
+  [ ] Deep DigiByte string cleanup
+  [ ] Revoke GitHub PAT after finished
+
+================================================================================
+6. EASY MODE — FOR THE “DUMBEST USER”
+================================================================================
+Scripts in Core repo (after pull):
+  scripts/easy-install-linux.sh  — install deps + build
+  scripts/easy-start.sh          — start node + print next steps
+  scripts/easy-wallet.sh         — new address + backup reminder
+  scripts/easy-mine.sh           — mine with chosen algo (randomx/yespower/verthash)
+  docs/ega/FOR-HUMANS.md         — plain language guide
+
+Shared mining options:
+  A) Everyone solo-mines to their own wallet (simplest fair launch)
+  B) Friends addnode to your seed and solo-mine (shared NETWORK, not shared rewards)
+  C) You run a pool (Miningcore) — true shared rewards (harder setup)
+
+"Shared mining" usually means C (pool). For launch, A+B is enough.
+
+================================================================================
+7. HOW TO MINE (CHEAT SHEET)
+================================================================================
+CPU RandomX:
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 randomx
+
+CPU YespowerEGA:
+  ega-cli generatetoaddress 1 "$(ega-cli getnewaddress)" 10000000 yespower-ega
+
+GPU Verthash:
+  # ega.conf: algo=verthash
+  # Generate dataset: python3 from ega-verthash-miner scripts/gen_ega_verthash_dat.py
+  # Build VerthashMiner OpenCL (-DUSE_CUDA=OFF), symlink kernels
+  # Mine GBT to RPC with --no-verthash-data_verification
+
+================================================================================
+8. GITHUB PAGES (WEBSITE)
+================================================================================
+Repo: Egalitarianism-EGA/ega-website
+URL:  https://egalitarianism-ega.github.io/ega-website/
+
+Manual if needed:
+  1. Open https://github.com/Egalitarianism-EGA/ega-website
+  2. Settings → Pages
+  3. Source: Deploy from branch
+  4. Branch: main, folder: / (root)
+  5. Save. Wait 1–2 minutes. Visit URL above.
+
+Optional custom domain later under Pages → Custom domain.
+
+================================================================================
+9. LOCAL MACHINE NOTES (THIS DEV BOX)
+================================================================================
+User path: /home/daimondsteel259/ega
+OS: Linux
+Wallet BDB: --with-incompatible-bdb (system DB 5.3)
+Config dual header history: ega-config.h is what sources include
+
+================================================================================
+10. IF STARTING A NEW CHAT
+================================================================================
+Say: "Continue Egalitarianism from EGA-HANDOFF.txt in the ega repo."
+Read: EGA-HANDOFF.txt, docs/ega/REPOS.md, docs/ega/params.md, docs/ega/STATUS-AND-ROADMAP.md
+Priority: easy scripts → seed node live → release binaries → pool/explorer.
+
+END OF HANDOFF
+================================================================================
