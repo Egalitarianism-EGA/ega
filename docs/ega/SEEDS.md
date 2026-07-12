@@ -1,62 +1,33 @@
 # Seed nodes & public services
 
-## Status (honest)
+## Published (operator PC — early network)
 
-| Service | Status |
-|---------|--------|
-| Prebuilt node | **v0.2.0** on GitHub Releases |
-| Your home node P2P | Port **20201** (must be reachable) |
-| Public seed list | Operators publish IPs below as they go live |
-| Public explorer | Tunnel or VPS → update website `explorer.html` |
-| Public pool | **Not published** yet |
+| Service | Endpoint | Notes |
+|---------|----------|-------|
+| P2P seed | `105.225.100.58:20201` | `addnode=105.225.100.58:20201` |
+| Explorer | `http://105.225.100.58:8088/` | Forward TCP **8088** |
+| Pool Verthash | `stratum+tcp://105.225.100.58:3334` | GPU; Miningcore share-verify |
+| Pool Scrypt | `stratum+tcp://105.225.100.58:3336` | Miningcore share-verify |
+| Pool API | `http://105.225.100.58:4000/api/pools` | Forward TCP **4000** if public |
 
-## Be a seed (operator)
+RandomX / YespowerEGA: **solo** on the node (not stock Miningcore).
 
-1. Run MultiShield-4 build (`v0.2.0+`).
-2. `egad` listening on **0.0.0.0:20201** (`listen=1`).
-3. Open **TCP 20201** on router/firewall (RPC **20202** stays localhost).
-4. Share: `addnode=YOUR_PUBLIC_IP:20201`
-5. Optional: keep a local explorer up and tunnel it (see `scripts/start-public-explorer.sh`).
+## Port-forward checklist
 
-```bash
-# ~/.ega/ega.conf essentials
-server=1
-listen=1
-txindex=1
-rpcbind=127.0.0.1
-rpcallowip=127.0.0.1
-# do NOT expose RPC to the internet
-```
+| Port | Service |
+|------|---------|
+| 20201 | P2P |
+| 8088 | Explorer |
+| 3334 | Verthash stratum |
+| 3336 | Scrypt stratum |
+| 4000 | Pool API (optional) |
+| **20202** | RPC — **do not** expose |
 
-## Join a seed (peer)
+## Operator start
 
 ```bash
-# ega.conf or CLI
-addnode=SEED_IP:20201
+bash scripts/easy-start.sh
+bash scripts/ega-explorer.sh          # or EGA_EXPLORER_HOST=0.0.0.0
+bash scripts/start-miningcore.sh
+bash scripts/start-gpu-verthash.sh    # RTX Verthash 24/7
 ```
-
-Or:
-
-```bash
-ega-cli addnode SEED_IP:20201 add
-ega-cli getpeerinfo
-```
-
-## Published seeds
-
-| Host | Port | Notes |
-|------|------|-------|
-| `105.225.100.58` | 20201 | Operator home node (early; confirm router port-forward) |
-| Explorer tunnel | HTTPS | `https://deposit-represented-seem-wrestling.trycloudflare.com` (ephemeral quick tunnel) |
-
-When you publish one, also update:
-
-- this table  
-- website home / explorer pages  
-- `share/examples/ega.conf` `#addnode=` comment  
-
-## Security
-
-- Never put `rpcuser` / `rpcpassword` on a public page.
-- Do not open **20202** to the world.
-- Prefer Tailscale/VPN between friends if you do not want a public IP.

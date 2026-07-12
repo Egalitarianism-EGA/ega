@@ -14,7 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-HOST = os.environ.get("EGA_EXPLORER_HOST", "127.0.0.1")
+# 0.0.0.0 = reachable on LAN/public IP when firewall allows (stable vs trycloudflare)
+HOST = os.environ.get("EGA_EXPLORER_HOST", "0.0.0.0")
 PORT = int(os.environ.get("EGA_EXPLORER_PORT", "8088"))
 RPC_URL = os.environ.get("EGA_RPC_URL", "http://127.0.0.1:20202")
 RPC_USER = os.environ.get("EGA_RPC_USER", "")
@@ -569,9 +570,9 @@ class Handler(BaseHTTPRequestHandler):
     <div class="s">of {esc(fmt_ega(snap['max_supply']))} max</div>
   </div>
   <div class="stat">
-    <div class="l">Network hashrate</div>
+    <div class="l">Est. hashrate (recent blocks)</div>
     <div class="v" style="font-size:1.05rem">{esc(fmt_hashrate(snap['network_hashps_rpc']))}</div>
-    <div class="s">from recent blocks (not min-diff math)</div>
+    <div class="s">history of work · not “miners online now”</div>
   </div>
 </div>
 

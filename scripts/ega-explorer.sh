@@ -15,7 +15,8 @@ if ! grep -qE '^[[:space:]]*txindex=1' "$HOME/.ega/ega.conf" 2>/dev/null; then
   echo "Tip: add txindex=1 to ~/.ega/ega.conf for full tx lookup (may need reindex)."
 fi
 
-export EGA_EXPLORER_HOST="${EGA_EXPLORER_HOST:-127.0.0.1}"
+export EGA_EXPLORER_HOST="${EGA_EXPLORER_HOST:-0.0.0.0}"
 export EGA_EXPLORER_PORT="${EGA_EXPLORER_PORT:-8088}"
 echo "Opening explorer on http://${EGA_EXPLORER_HOST}:${EGA_EXPLORER_PORT}/"
+echo "(Public: http://YOUR_IP:${EGA_EXPLORER_PORT}/ when TCP ${EGA_EXPLORER_PORT} is forwarded)"
 exec python3 "$ROOT/scripts/ega-explorer.py"
