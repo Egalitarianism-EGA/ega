@@ -129,18 +129,21 @@ def fmt_hashrate(hps: float) -> str:
 
 
 def fmt_diff(d) -> str:
+    """Human difficulty — avoid scientific noise at fair-launch floor."""
     try:
         d = float(d)
     except Exception:
         return str(d)
     if d <= 0:
         return "0"
+    if d < 1e-5:
+        return f"{d:.10f}".rstrip("0").rstrip(".")
     if d < 0.001:
-        return f"{d:.6g}"
+        return f"{d:.8f}".rstrip("0").rstrip(".")
     if d < 1:
-        return f"{d:.5g}"
+        return f"{d:.6f}".rstrip("0").rstrip(".")
     if d < 1000:
-        return f"{d:.4g}"
+        return f"{d:.4f}".rstrip("0").rstrip(".")
     return f"{d:,.2f}"
 
 
@@ -257,6 +260,10 @@ def network_snapshot():
     blocks_to_halving = max(0, next_halving - height)
     early = height < 100 or peers == 0
 
+    # Issued supply (subsidies at heights 1..height); genesis reward is 0
+    issued = sum(subsidy_at(h) for h in range(1, height + 1))
+    coinbase_maturity = 8  # EGA early-chain COINBASE_MATURITY (wallet now matches)
+
     return {
         "info": info,
         "height": height,
@@ -274,6 +281,8 @@ def network_snapshot():
         "blocks_to_halving": blocks_to_halving,
         "max_supply": MAX_SUPPLY,
         "block_time": BLOCK_TIME,
+        "issued_supply": issued,
+        "coinbase_maturity": coinbase_maturity,
     }
 
 
@@ -441,6 +450,8 @@ class Handler(BaseHTTPRequestHandler):
                     "network_hashps_measured_sum": snap["network_hashps_measured_sum"],
                     "window_blocks": snap["window_blocks"],
                     "share_reliable": snap["share_reliable"],
+                    "issued_supply_ega": snap["issued_supply"],
+                    "coinbase_maturity": snap["coinbase_maturity"],
                     "algorithms": snap["algos"],
                     "notes": {
                         "hashrate": "network_hashps is getnetworkhashps over recent blocks. Per-algo hashrate is only set when ≥2 blocks of that algo exist in the window (from timestamps); otherwise null — not a min-difficulty fiction.",
@@ -479,28 +490,27 @@ class Handler(BaseHTTPRequestHandler):
             name = a["algo"]
             col = colors.get(name, "var(--accent)")
             pct = a["share_pct"]
+            nblk = a["blocks_window"]
             if a["hashrate"] is not None:
                 hr_cell = f"<strong>{esc(fmt_hashrate(a['hashrate']))}</strong>"
-                hr_note = "from block times"
             else:
                 hr_cell = '<span class="muted">—</span>'
-                hr_note = "need ≥2 blocks"
-            if pct is None:
-                share_cell = '<span class="muted">—</span>'
-            else:
-                bar_w = pct if snap["share_reliable"] else min(pct, 100.0)
-                label = f"{pct:.0f}%" if snap["share_reliable"] else f"{pct:.0f}%*"
+            # Share: show count always; only show % bar when sample is large enough
+            if nblk <= 0:
+                share_cell = '<span class="muted">0</span>'
+            elif snap["share_reliable"] and pct is not None:
                 share_cell = f"""
                   <div style="display:flex;align-items:center;gap:.6rem">
-                    <div class="bar" style="flex:1"><i style="width:{bar_w:.1f}%;background:{col};opacity:{'1' if snap['share_reliable'] else '0.55'}"></i></div>
-                    <span class="muted" style="min-width:3.2rem">{label}</span>
+                    <div class="bar" style="flex:1"><i style="width:{pct:.1f}%;background:{col}"></i></div>
+                    <span class="muted" style="min-width:4rem">{nblk} · {pct:.0f}%</span>
                   </div>"""
+            else:
+                share_cell = f'<span class="mono">{nblk}</span> <span class="muted">/ {window} (too few for %)</span>'
             algo_rows.append(
                 f"""<tr>
                 <td>{algo_badge(name)}</td>
                 <td class="right mono">{esc(fmt_diff(a['difficulty']))}</td>
-                <td class="right mono">{hr_cell}<div class="s" style="font-size:.72rem">{hr_note}</div></td>
-                <td class="right">{a['blocks_window']}</td>
+                <td class="right mono">{hr_cell}</td>
                 <td>{share_cell}</td>
                 </tr>"""
             )
@@ -531,16 +541,14 @@ class Handler(BaseHTTPRequestHandler):
         if snap["early_network"]:
             early_banner = f"""
 <div class="note">
-  <strong>Early / local chain.</strong>
-  Height {esc(height)} · <strong>{esc(snap['peers'])} peers</strong>.
-  Difficulty is still near the fair-launch floor, so identical tiny difficulties across algos are normal — not four separate “live networks.”
-  Hashrate below is from <span class="mono">getnetworkhashps</span> on real blocks, not a made-up min-diff formula.
-  Algo share % with few blocks is noisy{'' if snap['share_reliable'] else ' (* = sample &lt; 20 blocks)'}.
+  <strong>Solo / early chain</strong> — height {esc(height)}, <strong>{esc(snap['peers'])} peers</strong>.
+  Identical low difficulties are the fair-launch floor, not four separate networks.
+  Mined rewards stay <em>immature</em> for {esc(snap['coinbase_maturity'])} confirmations (wallet “balance” can look 0 until then).
 </div>"""
 
         return f"""
 <h1>Network overview</h1>
-<p class="muted">Data from <strong>your</strong> local node RPC · MultiShield-4 · not a third-party feed</p>
+<p class="muted">Your node · MultiShield-4 · height, blocks, and difficulty are chain facts</p>
 
 {early_banner}
 
@@ -553,17 +561,17 @@ class Handler(BaseHTTPRequestHandler):
   <div class="stat">
     <div class="l">Block reward</div>
     <div class="v">{esc(fmt_ega(reward))} <span style="font-size:.7em">EGA</span></div>
-    <div class="s">halves every {HALVING_INTERVAL:,} blocks</div>
+    <div class="s">immature {esc(snap['coinbase_maturity'])} confs</div>
   </div>
   <div class="stat">
-    <div class="l">Next halving</div>
-    <div class="v" style="font-size:1.05rem">#{esc(f"{snap['next_halving_height']:,}")}</div>
-    <div class="s">{esc(f"{snap['blocks_to_halving']:,}")} blocks left</div>
+    <div class="l">Issued so far</div>
+    <div class="v" style="font-size:1.05rem">{esc(fmt_ega(snap['issued_supply']))}</div>
+    <div class="s">of {esc(fmt_ega(snap['max_supply']))} max</div>
   </div>
   <div class="stat">
     <div class="l">Network hashrate</div>
     <div class="v" style="font-size:1.05rem">{esc(fmt_hashrate(snap['network_hashps_rpc']))}</div>
-    <div class="s">getnetworkhashps · last {esc(min(120, max(1, height)))} blocks</div>
+    <div class="s">from recent blocks (not min-diff math)</div>
   </div>
 </div>
 
@@ -572,23 +580,20 @@ class Handler(BaseHTTPRequestHandler):
 <div class="card" id="algos">
   <div class="card-h">
     <h2>Algorithms</h2>
-    <span class="muted">live difficulty · measured hashrate only · last {esc(window)} blocks</span>
+    <span class="muted">last {esc(window)} blocks</span>
   </div>
   <table>
     <tr>
       <th>Algo</th>
       <th class="right">Difficulty</th>
       <th class="right">Hashrate</th>
-      <th class="right">Blocks</th>
-      <th>Share of window</th>
+      <th>Blocks in window</th>
     </tr>
     {''.join(algo_rows)}
   </table>
   <div style="padding:.75rem 1rem;border-top:1px solid var(--line)" class="muted">
-    <strong>What is real:</strong> height, block list, per-algo difficulty from the node, block rewards, peer count.
-    <strong>What is estimated:</strong> hashrate (from actual block times when enough samples exist; overall from <span class="mono">getnetworkhashps</span>).
-    We no longer show “network hashrate” from min difficulty alone — that always printed the same fake ~17 H/s per algo at launch.
-    Target spacing ~{BLOCK_TIME}s overall / ~{ALGO_TARGET_SPACING}s per algo. Max supply {MAX_SUPPLY:,} EGA.
+    Difficulty comes from the node. Hashrate per algo only when ≥2 blocks of that algo exist (from their timestamps).
+    Overall hashrate is <span class="mono">getnetworkhashps</span>. Share % appears only after ≥20 blocks in the window.
   </div>
 </div>
 

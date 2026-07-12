@@ -43,11 +43,11 @@
 
 ### On-chain / Core (medium)
 
-- Public **seed nodes** (you or friends run 24/7 `egad` + share IP)
+- Public **seed nodes** (you or friends run 24/7 `egad` + share IP) — see `docs/ega/SEEDS.md`
 - Optional: raise/adjust min difficulty after launch hashrate exists
 - Optional: RandomX **full dataset** mode for high-end CPU farms
 - Deeper DigiByte string cleanup (internal code still says digibyte in places)
-- Release **binaries** (Linux tarball / Windows zip) so non-builders can join
+- [x] Release **binaries** Linux tarball v0.2.0; Windows zip still open
 - CI green after workflow fix
 - GUI polish (window titles still partly DigiByte heritage)
 
@@ -68,7 +68,7 @@
 - [x] Getting started guide (`docs/ega/getting-started.md`)  
 - [x] Desktop app launchers (Wallet / Node / Miner)  
 - [x] Network multi-miner docs  
-- [ ] Prebuilt Releases for non-builders  
+- [x] Prebuilt Releases for non-builders (v0.2.0 Linux)  
 - [ ] Public seed IP list  
 - Security review of wallet/RPC exposure if you open ports to internet  
 

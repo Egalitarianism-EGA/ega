@@ -4422,7 +4422,19 @@ int CMerkleTx::GetBlocksToMaturity() const
         return 0;
     int chain_depth = GetDepthInMainChain();
     assert(chain_depth >= 0); // coinbase tx should not be conflicted
-    return std::max(0, (COINBASE_MATURITY_2+1) - chain_depth);
+    // EGA: match consensus (tx_verify) — DigiByte always used MATURITY_2 in the wallet,
+    // which left fair-launch balances stuck on "immature" for 100 blocks while spends
+    // were already allowed after COINBASE_MATURITY (8) for heights < 145000.
+    int maturity = COINBASE_MATURITY;
+    if (!hashUnset()) {
+        AssertLockHeld(cs_main);
+        if (CBlockIndex* pindex = LookupBlockIndex(hashBlock)) {
+            if (pindex->nHeight >= 145000)
+                maturity = COINBASE_MATURITY_2;
+        }
+    }
+    // Mature when chain_depth >= maturity (same relation as nSpendHeight - coinHeight).
+    return std::max(0, maturity - chain_depth);
 }
 
 
