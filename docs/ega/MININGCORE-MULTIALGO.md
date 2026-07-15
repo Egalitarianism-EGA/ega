@@ -9,8 +9,8 @@ Users can **solo or shared-mine** every MultiShield-4 algorithm.
 |------|---------|--------------|
 | Verthash | `:3334` | Yes (stock Miningcore + EGA dataset) |
 | Scrypt | `:3336` | Yes (stock scrypt hasher) |
-| RandomX | — | Solo only — needs custom work |
-| YespowerEGA | — | Solo only — needs custom work |
+| RandomX | `:3333` (`ega-algo-stratum.py`) | Yes (ega-pow-hash verify) |
+| YespowerEGA | `:3335` (`ega-algo-stratum.py`) | Yes (ega-pow-hash verify) |
 
 ## Why stock Miningcore is not enough for RX / YP
 

@@ -20,10 +20,12 @@ NETWORKS = [
         "key": "randomx",
         "name": "RandomX",
         "hw": "Laptop & desktop CPU",
-        "shared": False,
+        "shared": True,
         "port": 3333,
-        "pool_id": None,
+        "pool_id": None,  # stats from ega-algo-stratum (not Miningcore)
+        "stratum_live": True,
         "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 randomx",
+        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3333",
     },
     {
         "key": "verthash",
@@ -32,6 +34,7 @@ NETWORKS = [
         "shared": True,
         "port": 3334,
         "pool_id": "ega-verthash",
+        "stratum_live": True,
         "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 verthash",
         "stratum": f"stratum+tcp://{PUBLIC_HOST}:3334",
         "gpu_example": f"""VerthashMiner -a verthash \\
@@ -44,10 +47,12 @@ NETWORKS = [
         "key": "yespower-ega",
         "name": "YespowerEGA",
         "hw": "Phone, Pi, weak CPU",
-        "shared": False,
+        "shared": True,
         "port": 3335,
         "pool_id": None,
+        "stratum_live": True,
         "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 yespower-ega",
+        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3335",
     },
     {
         "key": "scrypt",
@@ -56,6 +61,7 @@ NETWORKS = [
         "shared": True,
         "port": 3336,
         "pool_id": "ega-scrypt",
+        "stratum_live": True,
         "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 scrypt",
         "stratum": f"stratum+tcp://{PUBLIC_HOST}:3336",
     },
@@ -169,16 +175,19 @@ def page_home():
 
     rows = []
     for n in NETWORKS:
-        p = pools.get(n["pool_id"]) if n["pool_id"] else None
-        if n["shared"] and p:
-            st = p.get("poolStats") or {}
+        p = pools.get(n["pool_id"]) if n.get("pool_id") else None
+        if n.get("shared") and n.get("stratum_live"):
+            if p:
+                st = p.get("poolStats") or {}
+                stats = f"Pool miners: {st.get('connectedMiners',0)} · {fmt_hps(st.get('poolHashrate'))}"
+            else:
+                stats = f"Stratum :{n['port']} · solo also OK"
             mode = '<span class="badge b-shared">Shared live</span> · solo OK'
-            stats = f"Pool miners: {st.get('connectedMiners',0)} · {fmt_hps(st.get('poolHashrate'))}"
-        elif n["shared"]:
-            mode = '<span class="badge b-shared">Shared</span> (pool offline)'
-            stats = "Start Miningcore on the operator"
+        elif n.get("shared"):
+            mode = '<span class="badge b-shared">Shared</span>'
+            stats = "Start pool services"
         else:
-            mode = '<span class="badge b-solo">Solo live</span> · shared coming'
+            mode = '<span class="badge b-solo">Solo</span>'
             stats = "Mine with your own node"
         rows.append(
             f"<tr><td><strong>{esc(n['name'])}</strong><br/><span style='color:var(--muted);font-size:.8rem'>{esc(n['hw'])}</span></td>"
@@ -253,54 +262,39 @@ def page_solo():
 def page_shared():
     pools, err = pools_by_id()
     live = []
-    soon = []
     for n in NETWORKS:
-        if n["shared"]:
-            p = pools.get(n["pool_id"]) if n["pool_id"] else None
-            st = (p or {}).get("poolStats") or {}
-            ns = (p or {}).get("networkStats") or {}
-            status = "Online" if p else "Offline"
-            live.append(
-                f"""<div class="card">
-                <h2>{esc(n['name'])} <span class="badge b-shared">Shared pool</span></h2>
-                <p style="color:var(--muted);font-size:.9rem">{esc(n['hw'])} · pool {esc(status)}</p>
-                <table>
-                  <tr><th>Stratum</th><td class="mono">{esc(n.get('stratum',''))}</td></tr>
-                  <tr><th>Username</th><td>Your EGA address (starts with E)</td></tr>
-                  <tr><th>Password</th><td class="mono">x</td></tr>
-                  <tr><th>Miners online</th><td>{esc(st.get('connectedMiners', 0 if p else '—'))}</td></tr>
-                  <tr><th>Pool hashrate</th><td>{esc(fmt_hps(st.get('poolHashrate')) if p else '—')}</td></tr>
-                  <tr><th>Network height</th><td>{esc(ns.get('blockHeight', '—'))}</td></tr>
-                </table>
-                {"<pre style='margin-top:.75rem'>"+esc(n.get('gpu_example',''))+"</pre>" if n.get('gpu_example') else ""}
-                </div>"""
-            )
-        else:
-            soon.append(
-                f"""<div class="card">
-                <h2>{esc(n['name'])} <span class="badge b-solo">Use solo for now</span></h2>
-                <p style="color:var(--muted);font-size:.9rem">
-                  Shared stratum for this algorithm is not open yet. You can still mine
-                  <strong>solo</strong> on any node (including Android light nodes) and earn full block rewards.
-                </p>
-                <p style="font-size:.9rem;margin-top:.5rem">Reserved pool port: <span class="mono">:{n['port']}</span></p>
-                <pre>{esc(n['solo_cmd'])}</pre>
-                <p style="color:var(--muted);font-size:.85rem">When shared opens, same coin — just point your miner at stratum instead.</p>
-                </div>"""
-            )
+        if not n.get("shared"):
+            continue
+        p = pools.get(n["pool_id"]) if n.get("pool_id") else None
+        st = (p or {}).get("poolStats") or {}
+        ns = (p or {}).get("networkStats") or {}
+        live.append(
+            f"""<div class="card">
+            <h2>{esc(n['name'])} <span class="badge b-shared">Shared</span></h2>
+            <p style="color:var(--muted);font-size:.9rem">{esc(n['hw'])}</p>
+            <table>
+              <tr><th>Stratum</th><td class="mono">{esc(n.get('stratum', f"stratum+tcp://{PUBLIC_HOST}:{n['port']}"))}</td></tr>
+              <tr><th>Username</th><td>Your EGA address (starts with E)</td></tr>
+              <tr><th>Password</th><td class="mono">x</td></tr>
+              <tr><th>Miners (Miningcore)</th><td>{esc(st.get('connectedMiners', '—') if p else 'EGA stratum')}</td></tr>
+              <tr><th>Pool hashrate</th><td>{esc(fmt_hps(st.get('poolHashrate')) if p else 'see solo+shared')}</td></tr>
+              <tr><th>Height</th><td>{esc(ns.get('blockHeight', '—') if p else '—')}</td></tr>
+            </table>
+            {"<pre style='margin-top:.75rem'>"+esc(n.get('gpu_example',''))+"</pre>" if n.get('gpu_example') else ""}
+            <p style="margin-top:.6rem;color:var(--muted);font-size:.88rem">You can still solo-mine this algo on your own node anytime.</p>
+            </div>"""
+        )
 
     body = f"""
 <h1>Shared mining (pool)</h1>
 <p class="sub">Combine hashrate with others · paid by shares · lower variance than solo.</p>
-{"<div class='err'>Cannot reach pool engine. Shared stats unavailable until Miningcore is running.</div>" if err else ""}
+{"<div class='note'>Miningcore stats for Verthash/Scrypt offline — stratum ports may still work if started.</div>" if err else ""}
 <div class="note">
   <strong>How shared works:</strong> your miner submits shares to the pool. When the pool finds a block,
-  rewards are split among miners by shares (PPLNS). Username = payout address.
+  rewards go to the pool wallet / share scheme. Username = your payout address.
 </div>
-<h2 style="margin:1rem 0 .5rem">Live shared pools</h2>
-{''.join(live) or '<p class="sub">None online.</p>'}
-<h2 style="margin:1.25rem 0 .5rem">Solo available (shared not open yet)</h2>
-{''.join(soon)}
+<h2 style="margin:1rem 0 .5rem">All four algorithms — shared stratum</h2>
+{''.join(live)}
 """
     return layout("Shared", "Shared", body)
 
@@ -316,22 +310,22 @@ def page_start():
 <tr>
   <td><strong>RandomX</strong><br/><span style="color:var(--muted);font-size:.8rem">CPU</span></td>
   <td class="mono" style="font-size:.78rem">generatetoaddress … randomx</td>
-  <td>Use solo until pool port :3333 opens</td>
+  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3333 · user=E… pass=x</td>
 </tr>
 <tr>
   <td><strong>Verthash</strong><br/><span style="color:var(--muted);font-size:.8rem">GPU</span></td>
   <td class="mono" style="font-size:.78rem">node or GPU solo</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3334<br/>user=E… address pass=x</td>
+  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3334 · user=E… pass=x</td>
 </tr>
 <tr>
   <td><strong>YespowerEGA</strong><br/><span style="color:var(--muted);font-size:.8rem">Phone / weak CPU</span></td>
   <td class="mono" style="font-size:.78rem">generatetoaddress … yespower-ega</td>
-  <td>Use solo until pool port :3335 opens</td>
+  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3335 · user=E… pass=x</td>
 </tr>
 <tr>
   <td><strong>Scrypt</strong></td>
   <td class="mono" style="font-size:.78rem">generatetoaddress … scrypt</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3336<br/>user=E… address pass=x</td>
+  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3336 · user=E… pass=x</td>
 </tr>
 </table>
 </div>

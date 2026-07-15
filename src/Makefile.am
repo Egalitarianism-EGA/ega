@@ -562,6 +562,24 @@ ega_mine_genesis_LDADD = \
 ega_mine_genesis_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS) $(SSL_LIBS) $(EVENT_LIBS)
 EXTRA_ega_mine_genesis_DEPENDENCIES = $(LIBRANDOMX)
 
+# EGA pool share-verify helper (header PoW hash)
+noinst_PROGRAMS += ega-pow-hash
+ega_pow_hash_SOURCES = ega_pow_hash.cpp
+ega_pow_hash_CPPFLAGS = $(AM_CPPFLAGS) $(DIGIBYTE_INCLUDES)
+ega_pow_hash_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+ega_pow_hash_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+ega_pow_hash_LDADD = \
+  $(LIBDIGIBYTE_CONSENSUS) \
+  $(LIBDIGIBYTE_UTIL) \
+  $(LIBDIGIBYTE_CRYPTO) \
+  $(LIBSECP256K1) \
+  $(LIBRANDOMX) \
+  $(LIBDIGIBYTE_CONSENSUS) \
+  $(LIBDIGIBYTE_UTIL) \
+  $(LIBDIGIBYTE_CRYPTO)
+ega_pow_hash_LDADD += $(BOOST_LIBS) $(CRYPTO_LIBS) $(SSL_LIBS) $(EVENT_LIBS)
+EXTRA_ega_pow_hash_DEPENDENCIES = $(LIBRANDOMX)
+
 # digibyte-tx binary #
 ega_tx_SOURCES = digibyte-tx.cpp
 ega_tx_CPPFLAGS = $(AM_CPPFLAGS) $(DIGIBYTE_INCLUDES)
