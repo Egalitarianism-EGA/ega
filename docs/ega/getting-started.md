@@ -58,3 +58,25 @@ Cheap Ampere A1 (2 OCPU / 12 GB) is enough for a **seed node** (not mining farm)
 ```bash
 bash scripts/low-power-mine.sh all 600   # 1 block / 10 min, rotates all 4
 ```
+
+
+## Android light node (no VPS)
+
+Run a pruned validating node on Termux — use your phone as a second peer:
+
+- Guide: [`ANDROID-LIGHT-NODE.md`](./ANDROID-LIGHT-NODE.md)
+- Config helper: `bash scripts/setup-android-node.sh`
+
+## Web wallet
+
+```bash
+bash scripts/start-web-wallet.sh
+# http://127.0.0.1:8090/  (phone on Wi-Fi: http://YOUR_LAN_IP:8090/)
+```
+
+## Mining UI (solo vs shared)
+
+```bash
+bash scripts/ega-pool-ui.sh
+# http://127.0.0.1:8089/  → Solo · Shared · Start · Blocks · Wallet
+```

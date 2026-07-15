@@ -4,87 +4,95 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f14" />
-  <title>EGA Web Wallet (light)</title>
+  <title>EGA Wallet</title>
   <style>
     :root { --bg:#0b0f14; --card:#151b24; --line:#2a3444; --text:#e8eef7; --muted:#8b9bb0; --accent:#3dd6c6; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
     .wrap { max-width: 420px; margin: 0 auto; padding: 1rem 1rem 2.5rem; }
-    h1 { font-size: 1.35rem; margin: 0.5rem 0; }
+    h1 { font-size: 1.35rem; margin: 0.5rem 0 0.25rem; }
     .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; margin: 0 0 0.85rem; }
-    label { display: block; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
-    input, textarea { width: 100%; background: #0a1018; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 0.65rem 0.75rem; font-size: 0.95rem; }
-    button { width: 100%; margin-top: 0.65rem; background: var(--accent); color: #042f2e; border: 0; border-radius: 10px; padding: 0.75rem; font-weight: 750; font-size: 1rem; }
+    label { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; font-weight: 700; }
+    input { width: 100%; background: #0a1018; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 0.65rem 0.75rem; font-size: 0.95rem; }
+    button { width: 100%; margin-top: 0.65rem; background: var(--accent); color: #042f2e; border: 0; border-radius: 10px; padding: 0.75rem; font-weight: 750; font-size: 1rem; cursor: pointer; }
     button.secondary { background: transparent; border: 1px solid var(--line); color: var(--text); }
     .bal { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
     .note { font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
     .err { color: #fecaca; font-size: 0.9rem; margin-top: 0.5rem; }
     .ok { color: #3dd68c; font-size: 0.9rem; margin-top: 0.5rem; }
     code { font-size: 0.8rem; word-break: break-all; }
+    .hid { display: none; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>EGA light wallet</h1>
-    <p class="sub">Phone / tablet friendly shell. Connects to <strong>your</strong> node RPC (not public internet). Scaffold for accessibility — not a custodian.</p>
+    <h1>EGA Wallet</h1>
+    <p class="sub">Works on phone, tablet, or desktop. Talks to your node (same device or home network).</p>
 
-    <div class="card">
-      <label>Node RPC URL</label>
-      <input id="rpc" value="http://127.0.0.1:20202" />
-      <label style="margin-top:0.65rem">RPC user</label>
-      <input id="user" value="ega" autocomplete="username" />
-      <label style="margin-top:0.65rem">RPC password</label>
-      <input id="pass" type="password" autocomplete="current-password" />
-      <button type="button" id="btnConnect">Connect</button>
+    <div class="card" id="setupCard">
+      <p class="note" style="margin-bottom:0.75rem">
+        Default uses this server’s built-in RPC proxy (recommended). Only change advanced settings if you know your node URL.
+      </p>
+      <button type="button" id="btnConnect">Open wallet</button>
+      <button type="button" class="secondary" id="btnAdv">Advanced RPC settings</button>
+      <div id="adv" class="hid" style="margin-top:0.75rem">
+        <label>Mode</label>
+        <select id="mode" style="width:100%;padding:0.55rem;border-radius:10px;background:#0a1018;color:var(--text);border:1px solid var(--line)">
+          <option value="proxy" selected>This server proxy (/rpc)</option>
+          <option value="direct">Direct node URL</option>
+        </select>
+        <label style="margin-top:0.65rem">Node RPC URL (direct mode)</label>
+        <input id="rpc" value="http://127.0.0.1:20202" />
+        <label style="margin-top:0.65rem">RPC user</label>
+        <input id="user" value="ega" autocomplete="username" />
+        <label style="margin-top:0.65rem">RPC password</label>
+        <input id="pass" type="password" autocomplete="current-password" />
+      </div>
       <div id="connMsg" class="note" style="margin-top:0.65rem"></div>
     </div>
 
-    <div class="card">
-      <label>Balance</label>
-      <div class="bal" id="bal">—</div>
-      <div class="note" id="balDetail">Immature rewards need confirmations before they spend.</div>
-      <button type="button" class="secondary" id="btnRefresh">Refresh</button>
-    </div>
-
-    <div class="card">
-      <label>Receive address</label>
-      <code id="addr">—</code>
-      <button type="button" class="secondary" id="btnNew">New address</button>
-    </div>
-
-    <div class="card">
-      <label>Send to address</label>
-      <input id="to" placeholder="E…" />
-      <label style="margin-top:0.65rem">Amount (EGA)</label>
-      <input id="amount" type="number" step="any" min="0" placeholder="10" />
-      <button type="button" id="btnSend">Send</button>
-      <div id="sendMsg"></div>
-    </div>
-
-    <div class="card note">
-      <strong>Security:</strong> Only use RPC on localhost or a trusted VPN/Tailscale to your home node.
-      Never put your rpcpassword on a public website host.
-      Production mobile app will use a light server protocol — this page is the first step for “poor device” access.
-      <br/><br/>
-      Mining on Android (Yespower/RandomX) will ship as a separate worker app pointing at pool or solo.
+    <div id="main" class="hid">
+      <div class="card">
+        <label>Spendable balance</label>
+        <div class="bal" id="bal">—</div>
+        <div class="note" id="balDetail"></div>
+        <button type="button" class="secondary" id="btnRefresh">Refresh</button>
+      </div>
+      <div class="card">
+        <label>Receive address</label>
+        <code id="addr">—</code>
+        <button type="button" class="secondary" id="btnNew">New address</button>
+      </div>
+      <div class="card">
+        <label>Send to</label>
+        <input id="to" placeholder="E…" />
+        <label style="margin-top:0.65rem">Amount (EGA)</label>
+        <input id="amount" type="number" step="any" min="0" placeholder="10" />
+        <button type="button" id="btnSend">Send</button>
+        <div id="sendMsg"></div>
+      </div>
+      <div class="card note">
+        Mining rewards need a few confirmations before they become spendable.
+        Full node on Android: see docs — Termux + pruned node.
+      </div>
     </div>
   </div>
   <script>
     const $ = (id) => document.getElementById(id);
     async function rpc(method, params = []) {
-      const url = $("rpc").value.replace(/\/$/, "");
-      const user = $("user").value;
-      const pass = $("pass").value;
-      const auth = btoa(user + ":" + pass);
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Basic " + auth,
-        },
-        body: JSON.stringify({ jsonrpc: "1.0", id: "ega-web", method, params }),
-      });
+      const mode = $("mode").value;
+      let url, headers = { "Content-Type": "application/json" };
+      const body = JSON.stringify({ jsonrpc: "1.0", id: "ega-web", method, params });
+      if (mode === "proxy") {
+        url = "/rpc";
+      } else {
+        url = $("rpc").value.replace(/\/$/, "");
+        const user = $("user").value;
+        const pass = $("pass").value;
+        headers.Authorization = "Basic " + btoa(user + ":" + pass);
+      }
+      const res = await fetch(url, { method: "POST", headers, body });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
       return data.result;
@@ -96,28 +104,24 @@
         const info = await rpc("getblockchaininfo");
         $("connMsg").textContent = "Connected · " + info.chain + " · height " + info.blocks;
         $("connMsg").className = "ok";
+        $("main").classList.remove("hid");
         await refresh();
+        await newAddr();
       } catch (e) {
-        $("connMsg").textContent = "Failed: " + e.message + " (browsers block cross-origin RPC unless you proxy; use localhost or a local proxy.)";
+        $("connMsg").textContent = "Failed: " + e.message;
         $("connMsg").className = "err";
       }
     }
     async function refresh() {
-      try {
-        const w = await rpc("getwalletinfo");
-        $("bal").textContent = (w.balance || 0) + " EGA";
-        $("balDetail").textContent = "Unconfirmed: " + (w.unconfirmed_balance || 0) + " · Immature: " + (w.immature_balance || 0);
-      } catch (e) {
-        $("bal").textContent = "—";
-        $("balDetail").textContent = e.message;
-      }
+      const w = await rpc("getwalletinfo");
+      $("bal").textContent = (w.balance || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " EGA";
+      $("balDetail").textContent =
+        "Unconfirmed: " + (w.unconfirmed_balance || 0) +
+        " · Immature (mining): " + (w.immature_balance || 0);
     }
     async function newAddr() {
-      try {
-        $("addr").textContent = await rpc("getnewaddress");
-      } catch (e) {
-        $("addr").textContent = e.message;
-      }
+      try { $("addr").textContent = await rpc("getnewaddress"); }
+      catch (e) { $("addr").textContent = e.message; }
     }
     async function send() {
       $("sendMsg").className = "note";
@@ -125,15 +129,16 @@
       try {
         const txid = await rpc("sendtoaddress", [$("to").value.trim(), parseFloat($("amount").value)]);
         $("sendMsg").className = "ok";
-        $("sendMsg").textContent = "Sent · txid " + txid;
+        $("sendMsg").textContent = "Sent · " + txid;
         await refresh();
       } catch (e) {
         $("sendMsg").className = "err";
         $("sendMsg").textContent = e.message;
       }
     }
+    $("btnAdv").onclick = () => $("adv").classList.toggle("hid");
     $("btnConnect").onclick = connect;
-    $("btnRefresh").onclick = refresh;
+    $("btnRefresh").onclick = () => refresh().catch((e) => { $("balDetail").textContent = e.message; });
     $("btnNew").onclick = newAddr;
     $("btnSend").onclick = send;
   </script>
