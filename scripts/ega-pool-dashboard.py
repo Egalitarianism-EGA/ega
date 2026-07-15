@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""EGA pool site — Solo vs Shared, clear setup for every algo. User-facing only."""
+"""
+EGA mining pool website (single-coin, 4 algos) — miner-facing UI.
+Inspired by typical pool sites: Network | Shared pool | Solo, Start, Wallet lookup.
+"""
 from __future__ import annotations
 
 import json
 import os
+import socket
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,68 +16,56 @@ from urllib.parse import parse_qs, urlparse
 HOST = os.environ.get("EGA_POOL_UI_HOST", "0.0.0.0")
 PORT = int(os.environ.get("EGA_POOL_UI_PORT", "8089"))
 API_BASE = os.environ.get("EGA_POOL_API_BASE", "http://127.0.0.1:4000").rstrip("/")
-PUBLIC_HOST = os.environ.get("EGA_PUBLIC_HOST", "105.225.100.58")
+RPC_URL = os.environ.get("EGA_RPC_URL", "http://127.0.0.1:20202")
+PUBLIC = os.environ.get("EGA_PUBLIC_HOST", "105.225.100.58")
+EXPLORER = os.environ.get("EGA_EXPLORER_URL", f"http://{PUBLIC}:8088")
+WALLET_WEB = os.environ.get("EGA_WALLET_URL", f"http://{PUBLIC}:8090")
 
-# Four networks under one coin
-NETWORKS = [
-    {
-        "key": "randomx",
-        "name": "RandomX",
-        "hw": "Laptop & desktop CPU",
-        "shared": True,
-        "port": 3333,
-        "pool_id": None,  # stats from ega-algo-stratum (not Miningcore)
-        "stratum_live": True,
-        "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 randomx",
-        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3333",
-    },
-    {
-        "key": "verthash",
-        "name": "Verthash",
-        "hw": "Normal GPU",
-        "shared": True,
-        "port": 3334,
-        "pool_id": "ega-verthash",
-        "stratum_live": True,
-        "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 verthash",
-        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3334",
-        "gpu_example": f"""VerthashMiner -a verthash \\
-  -o stratum+tcp://{PUBLIC_HOST}:3334 \\
-  -u YOUR_EGA_ADDRESS -p x \\
-  --all-cl-devices -f ega-verthash.dat \\
-  --no-verthash-data_verification""",
-    },
-    {
-        "key": "yespower-ega",
-        "name": "YespowerEGA",
-        "hw": "Phone, Pi, weak CPU",
-        "shared": True,
-        "port": 3335,
-        "pool_id": None,
-        "stratum_live": True,
-        "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 yespower-ega",
-        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3335",
-    },
-    {
-        "key": "scrypt",
-        "name": "Scrypt",
-        "hw": "CPU / future ASIC path",
-        "shared": True,
-        "port": 3336,
-        "pool_id": "ega-scrypt",
-        "stratum_live": True,
-        "solo_cmd": "ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 scrypt",
-        "stratum": f"stratum+tcp://{PUBLIC_HOST}:3336",
-    },
+ALGOS = [
+    {"name": "RandomX", "hw": "CPU / laptop", "port": 3333, "mc": None, "tag": "rx"},
+    {"name": "Verthash", "hw": "GPU", "port": 3334, "mc": "ega-verthash", "tag": "vh"},
+    {"name": "YespowerEGA", "hw": "Phone / weak CPU", "port": 3335, "mc": None, "tag": "yp"},
+    {"name": "Scrypt", "hw": "CPU / ASIC path", "port": 3336, "mc": "ega-scrypt", "tag": "sc"},
 ]
 
 
-def api_get(path: str):
+def esc(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+def api(path):
     try:
-        with urllib.request.urlopen(f"{API_BASE}{path}", timeout=10) as r:
+        with urllib.request.urlopen(f"{API_BASE}{path}", timeout=8) as r:
             return json.loads(r.read().decode()), None
     except Exception as e:
         return None, str(e)
+
+
+def rpc_load():
+    import base64
+    from pathlib import Path
+    user = passwd = ""
+    conf = Path.home() / ".ega" / "ega.conf"
+    if conf.is_file():
+        for line in conf.read_text(errors="replace").splitlines():
+            line = line.split("#", 1)[0].strip()
+            if line.startswith("rpcuser="):
+                user = line.split("=", 1)[1]
+            elif line.startswith("rpcpassword="):
+                passwd = line.split("=", 1)[1]
+    def rpc(method, params=None):
+        payload = json.dumps({"jsonrpc": "1.0", "id": "ui", "method": method, "params": params or []}).encode()
+        req = urllib.request.Request(RPC_URL, data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        if user or passwd:
+            tok = base64.b64encode(f"{user}:{passwd}".encode()).decode()
+            req.add_header("Authorization", f"Basic {tok}")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            d = json.loads(resp.read().decode())
+        if d.get("error"):
+            raise RuntimeError(d["error"])
+        return d["result"]
+    return rpc
 
 
 def fmt_hps(n):
@@ -81,335 +73,407 @@ def fmt_hps(n):
         n = float(n or 0)
     except Exception:
         return "0 H/s"
-    u = ["H/s", "kH/s", "MH/s", "GH/s", "TH/s"]
-    i = 0
-    while n >= 1000 and i < len(u) - 1:
+    for u in ["H/s", "kH/s", "MH/s", "GH/s", "TH/s"]:
+        if n < 1000:
+            return f"{n:.2f} {u}" if n < 100 else f"{n:.1f} {u}"
         n /= 1000
-        i += 1
-    return f"{n:.2f} {u[i]}" if n < 100 else f"{n:.1f} {u[i]}"
+    return f"{n:.2f} PH/s"
+
+
+def port_open(port: int) -> bool:
+    try:
+        s = socket.create_connection(("127.0.0.1", port), timeout=0.4)
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def chain_stats():
+    try:
+        rpc = rpc_load()
+        info = rpc("getblockchaininfo")
+        mining = rpc("getmininginfo")
+        peers = rpc("getconnectioncount")
+        try:
+            hr = float(rpc("getnetworkhashps", [120, -1]))
+        except Exception:
+            hr = 0.0
+        diffs = info.get("difficulties") or {}
+        return {
+            "height": info.get("blocks"),
+            "peers": peers,
+            "hr": hr,
+            "diffs": diffs,
+            "algo": mining.get("pow_algo"),
+            "ok": True,
+        }
+    except Exception as e:
+        return {"ok": False, "err": str(e)}
+
+
+CSS = """
+:root{--bg:#12151c;--panel:#1a1f2b;--panel2:#222836;--line:#2d3548;--text:#eef1f6;--muted:#8b95a8;
+--teal:#2dd4bf;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--pink:#f472b6}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;font-size:15px}
+a{color:var(--teal);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1120px;margin:0 auto;padding:0 1rem 3rem}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;
+padding:.85rem 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(18,21,28,.95);z-index:10;backdrop-filter:blur(8px)}
+.logo{font-weight:800;font-size:1.05rem;color:#fff;letter-spacing:-.02em}
+.logo span{color:var(--teal)}
+.nav{display:flex;flex-wrap:wrap;gap:.2rem}
+.nav a{color:var(--muted);padding:.45rem .7rem;border-radius:8px;font-weight:600;font-size:.88rem}
+.nav a:hover,.nav a.on{background:var(--panel);color:#fff;text-decoration:none}
+.bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.55rem;margin:1.1rem 0}
+.bar .b{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem}
+.bar .l{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+.bar .v{font-size:1.1rem;font-weight:800;margin-top:.15rem}
+.bar .s{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+h1{font-size:1.55rem;margin:1rem 0 .35rem;letter-spacing:-.03em}
+h2{font-size:1.05rem;margin:0 0 .65rem}
+.sub{color:var(--muted);margin-bottom:1rem}
+.cols{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin:1rem 0}
+@media(max-width:900px){.cols{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem 1.05rem;margin:0 0 1rem}
+.card h3{font-size:.95rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+.card ul{margin:.4rem 0 0 1.1rem;color:var(--muted);font-size:.9rem}
+.card li{margin:.25rem 0}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:.6rem .45rem;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem;word-break:break-all}
+.badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;font-size:.7rem;font-weight:700}
+.ok{background:rgba(52,211,153,.15);color:var(--green)}
+.warn{background:rgba(251,191,36,.12);color:var(--yellow)}
+.bad{background:rgba(244,114,182,.12);color:var(--pink)}
+pre{background:#0d1118;border:1px solid var(--line);border-radius:10px;padding:.75rem;overflow:auto;font-size:.8rem;margin:.5rem 0}
+.copy{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+.copy code{background:#0d1118;padding:.35rem .55rem;border-radius:8px;border:1px solid var(--line);font-size:.8rem}
+.btn{display:inline-block;background:var(--teal);color:#042f2e;padding:.55rem .9rem;border-radius:9px;font-weight:750;border:0;cursor:pointer;font-size:.9rem}
+.btn:hover{filter:brightness(1.08);text-decoration:none;color:#042f2e}
+.btn2{background:transparent;border:1px solid var(--line);color:var(--text)}
+.note{background:rgba(45,212,191,.07);border:1px solid rgba(45,212,191,.2);border-radius:12px;padding:.85rem 1rem;margin:1rem 0;font-size:.9rem}
+.search{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0}
+.search input{flex:1;min-width:200px;background:#0d1118;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:.7rem}
+.search button{background:var(--teal);color:#042f2e;border:0;border-radius:10px;padding:.7rem 1rem;font-weight:750;cursor:pointer}
+.err{color:#fecaca;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);padding:.8rem;border-radius:12px}
+footer{margin-top:2rem;padding-top:1rem;border-top:1px solid var(--line);color:var(--muted);font-size:.8rem;display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+.algo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.75rem}
+"""
+
+
+def layout(title, active, body):
+    def n(lab, href):
+        return f'<a class="{"on" if lab==active else ""}" href="{href}">{lab}</a>'
+    return f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta http-equiv="refresh" content="30"/>
+<title>{esc(title)} · EGA Pool</title>
+<style>{CSS}</style></head><body>
+<div class="wrap">
+<header class="top">
+  <div class="logo">EGA <span>Pool</span></div>
+  <nav class="nav">
+    {n("Home","/")}{n("Start","/start")}{n("Solo","/solo")}{n("Shared","/shared")}
+    {n("Blocks","/blocks")}{n("Wallet","/wallet")}
+    <a href="{esc(EXPLORER)}" target="_blank">Explorer</a>
+  </nav>
+</header>
+{body}
+<footer>
+  <span>Egalitarianism · MultiShield-4 · seed <span class="mono">{esc(PUBLIC)}:20201</span></span>
+  <span><a href="{esc(WALLET_WEB)}">Web wallet</a> · <a href="https://egalitarianism-ega.github.io/ega-website/">Website</a></span>
+</footer>
+</div></body></html>""".encode()
 
 
 def esc(s):
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-CSS = """
-:root{--bg:#0b0f14;--panel:#151b24;--line:#2a3444;--text:#e8eef7;--muted:#8b9bb0;
---accent:#3dd6c6;--good:#3dd68c;--warn:#e2b84a;--blue:#5b8def}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
-a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
-.wrap{max-width:1000px;margin:0 auto;padding:0 1rem 2.5rem}
-.top{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;align-items:center;
-padding:1rem 0;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,15,20,.95);z-index:5}
-.brand{font-weight:800;color:var(--text)}
-.nav{display:flex;flex-wrap:wrap;gap:.25rem}
-.nav a{color:var(--muted);padding:.4rem .65rem;border-radius:8px;font-weight:600;font-size:.9rem}
-.nav a.on,.nav a:hover{background:var(--panel);color:var(--text);text-decoration:none}
-h1{font-size:1.5rem;margin:1rem 0 .35rem}
-h2{font-size:1.05rem;margin:0 0 .6rem}
-.sub{color:var(--muted);margin-bottom:1rem}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1rem;margin:0 0 1rem}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;margin:1rem 0}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:.7rem .8rem}
-.stat .l{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
-.stat .v{font-size:1.15rem;font-weight:800;margin-top:.15rem}
-table{width:100%;border-collapse:collapse;font-size:.9rem}
-th,td{text-align:left;padding:.55rem .4rem;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-size:.72rem;text-transform:uppercase}
-.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.84rem;word-break:break-all}
-.badge{display:inline-block;padding:.12rem .45rem;border-radius:999px;font-size:.72rem;font-weight:700}
-.b-shared{background:rgba(61,214,140,.15);color:var(--good)}
-.b-solo{background:rgba(226,184,74,.15);color:var(--warn)}
-pre{background:#0a1018;border:1px solid var(--line);border-radius:10px;padding:.7rem;overflow:auto;font-size:.8rem;margin:.5rem 0}
-.note{background:rgba(61,214,198,.07);border:1px solid rgba(61,214,198,.22);border-radius:12px;padding:.85rem 1rem;margin:1rem 0;font-size:.92rem}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
-@media(max-width:720px){.two{grid-template-columns:1fr}}
-.search{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0}
-.search input{flex:1;min-width:180px;background:#0a1018;border:1px solid var(--line);color:var(--text);border-radius:10px;padding:.65rem}
-.search button{background:var(--accent);color:#042f2e;border:0;border-radius:10px;padding:.65rem 1rem;font-weight:750;cursor:pointer}
-.err{color:#fecaca;background:rgba(240,113,120,.1);border:1px solid rgba(240,113,120,.35);padding:.8rem;border-radius:12px}
-footer{margin-top:1.5rem;color:var(--muted);font-size:.8rem}
-.col h3{font-size:.95rem;margin-bottom:.4rem}
-"""
+def top_bar(cs, mc_pools):
+    miners = sum(int((p.get("poolStats") or {}).get("connectedMiners") or 0) for p in mc_pools.values())
+    blocks = sum(int(p.get("totalBlocks") or 0) for p in mc_pools.values())
+    open_ports = sum(1 for a in ALGOS if port_open(a["port"]))
+    return f"""
+<div class="bar">
+  <div class="b"><div class="l">Network height</div><div class="v">{esc(cs.get('height','—'))}</div><div class="s">{esc(cs.get('peers',0))} peers</div></div>
+  <div class="b"><div class="l">Network hashrate</div><div class="v" style="font-size:1rem">{esc(fmt_hps(cs.get('hr',0)))}</div><div class="s">from recent blocks</div></div>
+  <div class="b"><div class="l">Shared miners</div><div class="v">{esc(miners)}</div><div class="s">Miningcore workers</div></div>
+  <div class="b"><div class="l">Pool blocks</div><div class="v">{esc(blocks)}</div><div class="s">shared only</div></div>
+  <div class="b"><div class="l">Stratum ports</div><div class="v">{esc(open_ports)}/4</div><div class="s">listening</div></div>
+</div>"""
 
 
-def layout(title, active, body):
-    def n(label, href):
-        return f'<a class="{"on" if label==active else ""}" href="{href}">{label}</a>'
-
-    return f"""<!DOCTYPE html><html lang="en"><head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta http-equiv="refresh" content="40"/>
-<title>{esc(title)} · EGA Pool</title><style>{CSS}</style></head><body>
-<div class="wrap">
-<header class="top">
-  <a class="brand" href="/">Egalitarianism · Mine</a>
-  <nav class="nav">
-    {n("Home","/")}{n("Solo","/solo")}{n("Shared","/shared")}{n("Start","/start")}
-    {n("Blocks","/blocks")}{n("Wallet","/wallet")}
-  </nav>
-</header>
-{body}
-<footer>EGA · four algorithms · solo and shared · seed {esc(PUBLIC_HOST)}:20201</footer>
-</div></body></html>""".encode()
-
-
-def pools_by_id():
-    data, err = api_get("/api/pools")
+def load_mc():
+    data, err = api("/api/pools")
     if err or not data:
         return {}, err
     return {p["id"]: p for p in (data.get("pools") or [])}, None
 
 
 def page_home():
-    pools, err = pools_by_id()
-    miners = blocks = 0
-    height = "—"
-    for p in pools.values():
-        st = p.get("poolStats") or {}
-        ns = p.get("networkStats") or {}
-        miners += int(st.get("connectedMiners") or 0)
-        blocks += int(p.get("totalBlocks") or 0)
-        height = ns.get("blockHeight", height)
-
-    rows = []
-    for n in NETWORKS:
-        p = pools.get(n["pool_id"]) if n.get("pool_id") else None
-        if n.get("shared") and n.get("stratum_live"):
-            if p:
-                st = p.get("poolStats") or {}
-                stats = f"Pool miners: {st.get('connectedMiners',0)} · {fmt_hps(st.get('poolHashrate'))}"
-            else:
-                stats = f"Stratum :{n['port']} · solo also OK"
-            mode = '<span class="badge b-shared">Shared live</span> · solo OK'
-        elif n.get("shared"):
-            mode = '<span class="badge b-shared">Shared</span>'
-            stats = "Start pool services"
-        else:
-            mode = '<span class="badge b-solo">Solo</span>'
-            stats = "Mine with your own node"
-        rows.append(
-            f"<tr><td><strong>{esc(n['name'])}</strong><br/><span style='color:var(--muted);font-size:.8rem'>{esc(n['hw'])}</span></td>"
-            f"<td>{mode}</td><td style='color:var(--muted);font-size:.88rem'>{esc(stats)}</td></tr>"
-        )
-
+    cs = chain_stats()
+    mc, err = load_mc()
+    bar = top_bar(cs if cs.get("ok") else {}, mc)
+    cards = []
+    for a in ALGOS:
+        up = port_open(a["port"])
+        badge = f'<span class="badge ok">ONLINE</span>' if up else f'<span class="badge bad">OFFLINE</span>'
+        st = ""
+        if a["mc"] and a["mc"] in mc:
+            ps = mc[a["mc"]].get("poolStats") or {}
+            st = f"<div class='s' style='margin-top:.5rem;color:var(--muted)'>Miners {ps.get('connectedMiners',0)} · {fmt_hps(ps.get('poolHashrate'))}</div>"
+        cards.append(f"""
+        <div class="card">
+          <h3>{esc(a['name'])} {badge}</h3>
+          <div style="color:var(--muted);font-size:.85rem;margin-bottom:.45rem">{esc(a['hw'])}</div>
+          <div class="copy"><code>stratum+tcp://{esc(PUBLIC)}:{a['port']}</code></div>
+          <div style="margin-top:.45rem;font-size:.85rem;color:var(--muted)">user = <strong>your E… address</strong> · pass = <code>x</code></div>
+          {st}
+          <div style="margin-top:.65rem;font-size:.85rem">
+            <a href="/shared">Shared setup</a> · <a href="/solo">Solo setup</a>
+          </div>
+        </div>""")
     body = f"""
-<h1>Mine EGA</h1>
-<p class="sub">One coin, four algorithms. Choose <strong>solo</strong> or <strong>shared</strong> below.</p>
-{"<div class='err'>Pool engine offline — shared Verthash/Scrypt need Miningcore. Solo still works on any node.</div>" if err else ""}
-<div class="stats">
-  <div class="stat"><div class="l">Shared miners online</div><div class="v">{esc(miners)}</div></div>
-  <div class="stat"><div class="l">Shared pool blocks</div><div class="v">{esc(blocks)}</div></div>
-  <div class="stat"><div class="l">Chain height</div><div class="v">{esc(height)}</div></div>
-  <div class="stat"><div class="l">Network peers</div><div class="v" style="font-size:.95rem">Use seed {esc(PUBLIC_HOST)}</div></div>
-</div>
-<div class="two">
-  <div class="card col">
-    <h3>Solo mining</h3>
-    <p style="color:var(--muted);font-size:.9rem;margin-bottom:.5rem">
-      You run a node. When <em>you</em> find a block, you keep the full 50,000 EGA reward.
-      Best if you want full control. Works on all 4 algorithms today.
-    </p>
-    <a href="/solo">Open solo guide →</a>
+<h1>Egalitarianism mining pool</h1>
+<p class="sub">One coin · four algorithms · <strong>solo</strong> and <strong>shared</strong></p>
+{bar}
+{"<div class='err'>Chain RPC issue: "+esc(cs.get('err',''))+"</div>" if not cs.get("ok") else ""}
+<div class="cols">
+  <div class="card">
+    <h3>🌐 Network</h3>
+    <ul>
+      <li>Height: <strong>{esc(cs.get('height','—'))}</strong></li>
+      <li>Peers: <strong>{esc(cs.get('peers',0))}</strong></li>
+      <li>Seed: <span class="mono">{esc(PUBLIC)}:20201</span></li>
+      <li><a href="{esc(EXPLORER)}" target="_blank">Block explorer</a></li>
+    </ul>
   </div>
-  <div class="card col">
-    <h3>Shared mining (pool)</h3>
-    <p style="color:var(--muted);font-size:.9rem;margin-bottom:.5rem">
-      Many miners combine work. You get paid by shares when the pool finds blocks — steadier than solo.
-      Live now: <strong>Verthash</strong> + <strong>Scrypt</strong>. RandomX + YespowerEGA shared ports next.
-    </p>
-    <a href="/shared">Open shared guide →</a>
+  <div class="card">
+    <h3>🤝 Shared pool</h3>
+    <ul>
+      <li>Connect miner → get paid by shares</li>
+      <li>Steadier than solo</li>
+      <li>All 4 algos have stratum ports</li>
+      <li><a href="/shared">How to connect →</a></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>⛏️ Solo mining</h3>
+    <ul>
+      <li>You find the block → full 50,000 EGA</li>
+      <li>Run a node (PC or Android)</li>
+      <li>Higher variance</li>
+      <li><a href="/solo">Solo guide →</a></li>
+    </ul>
   </div>
 </div>
-<div class="card">
-  <h2>All four networks</h2>
-  <table>
-    <tr><th>Algorithm</th><th>What you can do</th><th>Live stats</th></tr>
-    {''.join(rows)}
-  </table>
+<div class="note">
+  <strong>Quick start:</strong> get an address from the <a href="{esc(WALLET_WEB)}">web wallet</a> or <code>ega-cli getnewaddress</code>,
+  then point your miner at the stratum below. Join the network with <code>addnode={esc(PUBLIC)}:20201</code>.
 </div>
+<h2 style="margin:1.25rem 0 .75rem">Algorithms</h2>
+<div class="algo-grid">{''.join(cards)}</div>
 """
     return layout("Home", "Home", body)
 
 
-def page_solo():
-    blocks = []
-    for n in NETWORKS:
-        blocks.append(
-            f"""<div class="card">
-            <h2>{esc(n['name'])} <span class="badge b-solo">Solo</span></h2>
-            <p style="color:var(--muted);font-size:.9rem">{esc(n['hw'])}</p>
-            <p style="margin:.5rem 0;font-size:.9rem"><strong>1.</strong> Run a full or light node (PC or Android Termux).</p>
-            <p style="margin:.5rem 0;font-size:.9rem"><strong>2.</strong> Mine to your wallet:</p>
-            <pre>{esc(n['solo_cmd'])}</pre>
-            <p style="color:var(--muted);font-size:.85rem">You receive the whole block reward when you find a block (after maturity confirmations).</p>
-            </div>"""
-        )
-    body = f"""
-<h1>Solo mining</h1>
-<p class="sub">Your node · your work · full block reward when you win.</p>
-<div class="note">
-  <strong>Setup once:</strong> install EGA, start <code>egad</code>, create an address with <code>ega-cli getnewaddress</code>.
-  Join seed: <code>addnode={esc(PUBLIC_HOST)}:20201</code> in <code>~/.ega/ega.conf</code>.
-  Android light node: see project docs <span class="mono">ANDROID-LIGHT-NODE.md</span>.
-</div>
-{''.join(blocks)}
-"""
-    return layout("Solo", "Solo", body)
-
-
-def page_shared():
-    pools, err = pools_by_id()
-    live = []
-    for n in NETWORKS:
-        if not n.get("shared"):
-            continue
-        p = pools.get(n["pool_id"]) if n.get("pool_id") else None
-        st = (p or {}).get("poolStats") or {}
-        ns = (p or {}).get("networkStats") or {}
-        live.append(
-            f"""<div class="card">
-            <h2>{esc(n['name'])} <span class="badge b-shared">Shared</span></h2>
-            <p style="color:var(--muted);font-size:.9rem">{esc(n['hw'])}</p>
-            <table>
-              <tr><th>Stratum</th><td class="mono">{esc(n.get('stratum', f"stratum+tcp://{PUBLIC_HOST}:{n['port']}"))}</td></tr>
-              <tr><th>Username</th><td>Your EGA address (starts with E)</td></tr>
-              <tr><th>Password</th><td class="mono">x</td></tr>
-              <tr><th>Miners (Miningcore)</th><td>{esc(st.get('connectedMiners', '—') if p else 'EGA stratum')}</td></tr>
-              <tr><th>Pool hashrate</th><td>{esc(fmt_hps(st.get('poolHashrate')) if p else 'see solo+shared')}</td></tr>
-              <tr><th>Height</th><td>{esc(ns.get('blockHeight', '—') if p else '—')}</td></tr>
-            </table>
-            {"<pre style='margin-top:.75rem'>"+esc(n.get('gpu_example',''))+"</pre>" if n.get('gpu_example') else ""}
-            <p style="margin-top:.6rem;color:var(--muted);font-size:.88rem">You can still solo-mine this algo on your own node anytime.</p>
-            </div>"""
-        )
-
-    body = f"""
-<h1>Shared mining (pool)</h1>
-<p class="sub">Combine hashrate with others · paid by shares · lower variance than solo.</p>
-{"<div class='note'>Miningcore stats for Verthash/Scrypt offline — stratum ports may still work if started.</div>" if err else ""}
-<div class="note">
-  <strong>How shared works:</strong> your miner submits shares to the pool. When the pool finds a block,
-  rewards go to the pool wallet / share scheme. Username = your payout address.
-</div>
-<h2 style="margin:1rem 0 .5rem">All four algorithms — shared stratum</h2>
-{''.join(live)}
-"""
-    return layout("Shared", "Shared", body)
-
-
 def page_start():
-    # compact cheat sheet both modes
+    rows = []
+    for a in ALGOS:
+        up = "● online" if port_open(a["port"]) else "○ offline"
+        rows.append(f"""
+        <tr>
+          <td><strong>{esc(a['name'])}</strong><br/><span style="color:var(--muted);font-size:.8rem">{esc(a['hw'])}</span></td>
+          <td class="mono">stratum+tcp://{esc(PUBLIC)}:{a['port']}</td>
+          <td>Your E… address</td>
+          <td class="mono">x</td>
+          <td>{up}</td>
+        </tr>""")
     body = f"""
-<h1>Start here</h1>
-<p class="sub">Pick hardware → pick solo or shared → copy settings.</p>
+<h1>Start mining</h1>
+<p class="sub">Copy these settings into your miner software.</p>
 <div class="card">
 <table>
-<tr><th>Algo</th><th>Solo</th><th>Shared</th></tr>
-<tr>
-  <td><strong>RandomX</strong><br/><span style="color:var(--muted);font-size:.8rem">CPU</span></td>
-  <td class="mono" style="font-size:.78rem">generatetoaddress … randomx</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3333 · user=E… pass=x</td>
-</tr>
-<tr>
-  <td><strong>Verthash</strong><br/><span style="color:var(--muted);font-size:.8rem">GPU</span></td>
-  <td class="mono" style="font-size:.78rem">node or GPU solo</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3334 · user=E… pass=x</td>
-</tr>
-<tr>
-  <td><strong>YespowerEGA</strong><br/><span style="color:var(--muted);font-size:.8rem">Phone / weak CPU</span></td>
-  <td class="mono" style="font-size:.78rem">generatetoaddress … yespower-ega</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3335 · user=E… pass=x</td>
-</tr>
-<tr>
-  <td><strong>Scrypt</strong></td>
-  <td class="mono" style="font-size:.78rem">generatetoaddress … scrypt</td>
-  <td class="mono" style="font-size:.78rem">stratum+tcp://{esc(PUBLIC_HOST)}:3336 · user=E… pass=x</td>
-</tr>
+<tr><th>Algorithm</th><th>Stratum (shared)</th><th>Username</th><th>Password</th><th>Status</th></tr>
+{''.join(rows)}
 </table>
 </div>
 <div class="card">
-<h2>Join the network</h2>
-<pre>addnode={esc(PUBLIC_HOST)}:20201</pre>
-<p style="color:var(--muted);font-size:.9rem">Wallet: desktop <code>ega-qt</code>, CLI, or web wallet on port 8090.</p>
+  <h2>GPU Verthash example</h2>
+  <pre>VerthashMiner -a verthash \\
+  -o stratum+tcp://{esc(PUBLIC)}:3334 \\
+  -u YOUR_EGA_ADDRESS -p x \\
+  --all-cl-devices -f ega-verthash.dat \\
+  --no-verthash-data_verification</pre>
+  <p style="color:var(--muted);font-size:.88rem">Need the EGA 256 MiB dataset (not Vertcoin’s file). See ega-verthash-miner on GitHub.</p>
+</div>
+<div class="card">
+  <h2>CPU / phone (shared or solo)</h2>
+  <p style="color:var(--muted);font-size:.9rem;margin-bottom:.5rem">Shared: use stratum for RandomX (:3333) or YespowerEGA (:3335) if your miner supports Bitcoin-style stratum.</p>
+  <p style="color:var(--muted);font-size:.9rem;margin-bottom:.5rem">Solo (always works with a node):</p>
+  <pre>ega-cli generatetoaddress 1 $(ega-cli getnewaddress) 10000000 yespower-ega
+# or: randomx | verthash | scrypt</pre>
+</div>
+<div class="card">
+  <h2>Join the chain first</h2>
+  <pre># in ~/.ega/ega.conf
+addnode={esc(PUBLIC)}:20201</pre>
 </div>
 """
     return layout("Start", "Start", body)
 
 
+def page_solo():
+    body = f"""
+<h1>Solo mining</h1>
+<p class="sub">You run a node. When you find a block, you keep the <strong>full 50,000 EGA</strong> (after maturity).</p>
+<div class="cols">
+  <div class="card">
+    <h3>1. Run a node</h3>
+    <pre>egad -daemon
+# Android Termux: pruned light node
+# docs/ega/ANDROID-LIGHT-NODE.md</pre>
+  </div>
+  <div class="card">
+    <h3>2. Connect to seed</h3>
+    <pre>addnode={esc(PUBLIC)}:20201</pre>
+  </div>
+  <div class="card">
+    <h3>3. Get an address</h3>
+    <pre>ega-cli getnewaddress
+# or web wallet {esc(WALLET_WEB)}</pre>
+  </div>
+</div>
+<div class="card">
+  <h2>Mine one block (any algo)</h2>
+  <pre>ega-cli generatetoaddress 1 YOUR_ADDRESS 10000000 randomx
+ega-cli generatetoaddress 1 YOUR_ADDRESS 10000000 yespower-ega
+ega-cli generatetoaddress 1 YOUR_ADDRESS 10000000 verthash
+ega-cli generatetoaddress 1 YOUR_ADDRESS 10000000 scrypt</pre>
+  <p style="color:var(--muted);font-size:.88rem">Rewards stay immature for a few confirmations, then appear as spendable balance.</p>
+</div>
+<div class="note">Solo = high variance. Shared pool = steadier. You can use both.</div>
+"""
+    return layout("Solo", "Solo", body)
+
+
+def page_shared():
+    mc, err = load_mc()
+    cards = []
+    for a in ALGOS:
+        up = port_open(a["port"])
+        badge = '<span class="badge ok">STRATUM UP</span>' if up else '<span class="badge bad">STRATUM DOWN</span>'
+        extra = ""
+        if a["mc"] and a["mc"] in mc:
+            st = mc[a["mc"]].get("poolStats") or {}
+            ns = mc[a["mc"]].get("networkStats") or {}
+            extra = f"""<tr><th>Miners</th><td>{esc(st.get('connectedMiners',0))}</td></tr>
+            <tr><th>Pool HR</th><td>{esc(fmt_hps(st.get('poolHashrate')))}</td></tr>
+            <tr><th>Height</th><td>{esc(ns.get('blockHeight','—'))}</td></tr>"""
+        cards.append(f"""
+        <div class="card">
+          <h3>{esc(a['name'])} {badge}</h3>
+          <p style="color:var(--muted);font-size:.88rem;margin-bottom:.5rem">{esc(a['hw'])}</p>
+          <table>
+            <tr><th>URL</th><td class="mono">stratum+tcp://{esc(PUBLIC)}:{a['port']}</td></tr>
+            <tr><th>User</th><td>EGA address starting with E</td></tr>
+            <tr><th>Pass</th><td class="mono">x</td></tr>
+            {extra}
+          </table>
+        </div>""")
+    body = f"""
+<h1>Shared mining</h1>
+<p class="sub">Many miners · shares · steadier payouts when the pool finds blocks.</p>
+<div class="note">
+  <strong>How it works:</strong> your miner sends <em>shares</em> (partial proofs of work) to the pool.
+  When the pool finds a full block, rewards are distributed by share contribution.
+  Username must be the address that should get paid.
+</div>
+{"<div class='err'>Miningcore API unreachable for Verthash/Scrypt stats (stratum may still accept miners).</div>" if err else ""}
+<div class="algo-grid">{''.join(cards)}</div>
+"""
+    return layout("Shared", "Shared", body)
+
+
 def page_blocks():
-    pools, err = pools_by_id()
+    mc, err = load_mc()
     parts = []
     if err:
         parts.append(f'<div class="err">{esc(err)}</div>')
-    for n in NETWORKS:
-        if not n["pool_id"]:
-            parts.append(
-                f'<div class="card"><h2>{esc(n["name"])}</h2>'
-                f'<p style="color:var(--muted)">Solo blocks show on the '
-                f'<a href="http://{esc(PUBLIC_HOST)}:8088/">block explorer</a>.</p></div>'
-            )
+    for a in ALGOS:
+        if not a["mc"]:
+            parts.append(f"""<div class="card"><h2>{esc(a['name'])}</h2>
+            <p style="color:var(--muted)">Solo + EGA stratum blocks appear on the
+            <a href="{esc(EXPLORER)}">explorer</a>.</p></div>""")
             continue
-        data, e2 = api_get(f"/api/pools/{n['pool_id']}/blocks")
+        data, e2 = api(f"/api/pools/{a['mc']}/blocks")
         rows = []
         if isinstance(data, list):
-            for b in data[:30]:
+            for b in data[:40]:
                 rows.append(
                     f"<tr><td>{esc(b.get('blockHeight',''))}</td>"
-                    f"<td class='mono'>{esc(str(b.get('status',''))[:40])}</td>"
-                    f"<td class='mono'>{esc(str(b.get('created',''))[:24])}</td></tr>"
+                    f"<td class='mono'>{esc(str(b.get('status',''))[:48])}</td>"
+                    f"<td class='mono'>{esc(str(b.get('created',''))[:28])}</td></tr>"
                 )
-        parts.append(
-            f"""<div class="card"><h2>{esc(n['name'])} · shared pool blocks</h2>
-            <table><tr><th>Height</th><th>Status</th><th>When</th></tr>
-            {''.join(rows) or '<tr><td colspan="3" style="color:var(--muted)">No pool blocks yet.</td></tr>'}
-            </table></div>"""
-        )
-    body = f"<h1>Blocks</h1><p class='sub'>Found by shared pools. Solo finds appear on the explorer.</p>{''.join(parts)}"
+        parts.append(f"""<div class="card"><h2>{esc(a['name'])} · pool blocks</h2>
+        <table><tr><th>Height</th><th>Status</th><th>Time</th></tr>
+        {''.join(rows) or '<tr><td colspan="3" style="color:var(--muted)">No pool blocks yet — connect hashrate.</td></tr>'}
+        </table></div>""")
+    body = f"<h1>Blocks</h1><p class='sub'>Found by shared pools. Solo blocks → explorer.</p>{''.join(parts)}"
     return layout("Blocks", "Blocks", body)
 
 
 def page_wallet(addr=""):
     addr = (addr or "").strip()
     form = f"""<form class="search" method="get" action="/wallet">
-      <input name="address" value="{esc(addr)}" placeholder="Your EGA address (E…)"/>
+      <input name="address" value="{esc(addr)}" placeholder="Paste EGA address (E…)"/>
       <button type="submit">Lookup</button>
     </form>"""
     extra = ""
     if addr:
-        bits = []
-        for n in NETWORKS:
-            if not n["pool_id"]:
+        bits = [
+            f'<div class="note">Also open in explorer: '
+            f'<a href="{esc(EXPLORER)}/address/{esc(urllib.parse.quote(addr))}" target="_blank">{esc(addr)}</a></div>'
+        ]
+        mc, _ = load_mc()
+        for a in ALGOS:
+            if not a["mc"]:
                 bits.append(
-                    f"<div class='card'><h2>{esc(n['name'])}</h2>"
-                    f"<p style='color:var(--muted)'>Solo rewards: "
-                    f"<a href='http://{esc(PUBLIC_HOST)}:8088/address/{esc(urllib.parse.quote(addr))}'>open in explorer</a></p></div>"
+                    f"<div class='card'><h3>{esc(a['name'])}</h3>"
+                    f"<p style='color:var(--muted)'>Use explorer for solo rewards. Stratum :{a['port']} for shared.</p></div>"
                 )
                 continue
-            data, err = api_get(f"/api/pools/{n['pool_id']}/miners/{urllib.parse.quote(addr)}")
+            data, err = api(f"/api/pools/{a['mc']}/miners/{urllib.parse.quote(addr)}")
             if err or not data:
                 bits.append(
-                    f"<div class='card'><h2>{esc(n['name'])} · shared</h2>"
-                    f"<p style='color:var(--muted)'>No shared-pool activity for this address yet. "
-                    f"Point a miner at stratum with this address as username.</p></div>"
+                    f"<div class='card'><h3>{esc(a['name'])}</h3>"
+                    f"<p style='color:var(--muted)'>No shared-pool shares for this address yet.</p></div>"
                 )
             else:
                 bits.append(
-                    f"<div class='card'><h2>{esc(n['name'])} · shared</h2>"
-                    f"<pre>{esc(json.dumps(data, indent=2)[:1200])}</pre></div>"
+                    f"<div class='card'><h3>{esc(a['name'])} · pool stats</h3>"
+                    f"<pre>{esc(json.dumps(data, indent=2)[:1500])}</pre></div>"
                 )
-        extra = f"<p class='sub'>Address <span class='mono'>{esc(addr)}</span></p>" + "".join(bits)
+        extra = "".join(bits)
     body = f"""
 <h1>Wallet lookup</h1>
-<p class="sub">Check shared-pool stats for your address. Solo balance is on the explorer / web wallet.</p>
+<p class="sub">Check shared-pool activity for your address (like other pools’ “account” page).</p>
 {form}
-{extra or '<div class="note">Enter the address you use as stratum username.</div>'}
+{extra or '<div class="note">Enter the same address you use as stratum username.</div>'}
+<div class="card">
+  <h2>Need a wallet?</h2>
+  <p><a class="btn" href="{esc(WALLET_WEB)}">Open web wallet</a>
+  <a class="btn btn2" style="margin-left:.4rem" href="https://github.com/Egalitarianism-EGA/ega/releases">Download node / Qt</a></p>
+</div>
 """
     return layout("Wallet", "Wallet", body)
 
 
-class Handler(BaseHTTPRequestHandler):
+class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
@@ -417,18 +481,19 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         path = u.path.rstrip("/") or "/"
         q = parse_qs(u.query)
-        pages = {
-            "/": page_home,
-            "/solo": page_solo,
-            "/shared": page_shared,
-            "/start": page_start,
-            "/blocks": page_blocks,
-        }
         try:
-            if path == "/wallet":
+            if path == "/":
+                body = page_home()
+            elif path == "/start":
+                body = page_start()
+            elif path == "/solo":
+                body = page_solo()
+            elif path == "/shared":
+                body = page_shared()
+            elif path == "/blocks":
+                body = page_blocks()
+            elif path == "/wallet":
                 body = page_wallet((q.get("address") or [""])[0])
-            elif path in pages:
-                body = pages[path]()
             else:
                 body = layout("404", "", '<div class="err">Not found</div>')
                 self.send_response(404)
@@ -452,8 +517,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    print(f"Pool UI http://{HOST}:{PORT}/  Solo=/solo Shared=/shared")
-    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
+    print(f"EGA Pool site http://{HOST}:{PORT}/")
+    ThreadingHTTPServer((HOST, PORT), H).serve_forever()
 
 
 if __name__ == "__main__":
