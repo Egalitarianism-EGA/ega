@@ -53,9 +53,19 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
-            f = WALLET_DIR / "index.html"
-            self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+            self._send(200, (WALLET_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
             return
+        mapping = {
+            "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+            "/sw.js": ("sw.js", "application/javascript"),
+            "/icon.svg": ("icon.svg", "image/svg+xml"),
+        }
+        if path in mapping:
+            name, ctype = mapping[path]
+            f = WALLET_DIR / name
+            if f.is_file():
+                self._send(200, f.read_bytes(), ctype)
+                return
         self._send(404, b"not found", "text/plain")
 
     def do_POST(self):

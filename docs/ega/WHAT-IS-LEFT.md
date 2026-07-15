@@ -19,8 +19,8 @@
 ## Still a boatload (must do for “like real coins”)
 
 ### Pool product (HeroMiners-level)
-- [ ] Payment history page that looks finished (PPLNS accounting UX)
-- [ ] Workers table per address (name, HR, last share)
+- [x] Workers + payments pages on pool UI (basic)
+- [ ] Richer PPLNS charts / multi-region
 - [ ] Charts (your earnings / pool HR over time)
 - [ ] Multi-region hosts (later)
 - [ ] Stable domain (not raw IP)
@@ -34,12 +34,14 @@
 
 ### Downloads
 - [ ] Always ship `ega-qt` in every Linux release (when built on CI)
-- [ ] **linux-aarch64** release for Android (skip compile on phone)
+- [x] CI workflow for linux-aarch64 (manual/dispatch; needs ARM runner)
+- [ ] Publish aarch64 tarball to Releases when CI green
 - [ ] **Windows** egad/ega-cli/ega-qt zip
 - [ ] Signed checksums
 
 ### Mobile apps
-- [ ] Android APK / PWA installable (beyond browser + Termux)
+- [x] Web wallet PWA installable in browser
+- [ ] Native Android APK (optional later)
 - [ ] In-app miner for Yespower
 - [ ] Push notifications (optional)
 

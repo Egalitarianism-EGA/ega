@@ -1,0 +1,53 @@
+# Build linux-aarch64 binaries for Android/Termux / ARM VPS
+name: linux-aarch64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - ".github/workflows/build-aarch64.yml"
+
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04-arm
+    # Falls back if arm runner unavailable — users can re-run when free
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            build-essential libtool autotools-dev automake pkg-config bsdmainutils python3 \
+            libevent-dev libboost-system-dev libboost-filesystem-dev libboost-test-dev \
+            libboost-thread-dev libsqlite3-dev libminiupnpc-dev libzmq3-dev libssl-dev cmake
+      - name: Configure & build
+        run: |
+          ./autogen.sh
+          ./configure --without-gui --disable-tests --disable-bench
+          make -j$(nproc) -C src egad ega-cli ega-pow-hash
+      - name: Package
+        run: |
+          VER=$(git describe --tags --always 2>/dev/null || echo dev)
+          NAME="ega-${VER#v}-linux-aarch64"
+          mkdir -p /tmp/$NAME/bin /tmp/$NAME/scripts /tmp/$NAME/docs /tmp/$NAME/web-wallet
+          cp -a src/egad src/ega-cli src/ega-pow-hash /tmp/$NAME/bin/
+          cp -a scripts/easy-start.sh scripts/easy-mine.sh scripts/setup-android-node.sh \
+            scripts/use-ega-cli.sh scripts/start-web-wallet.sh scripts/ega-web-wallet-server.py \
+            scripts/ega-explorer.sh scripts/ega-explorer.py \
+            /tmp/$NAME/scripts/ 2>/dev/null || true
+          cp -a docs/ega/ANDROID-SETUP-STEP-BY-STEP.md docs/ega/ANDROID-LIGHT-NODE.md \
+            docs/ega/getting-started.md docs/ega/params.md /tmp/$NAME/docs/ 2>/dev/null || true
+          cp -a web-wallet/* /tmp/$NAME/web-wallet/ 2>/dev/null || true
+          cp share/examples/ega-light.conf /tmp/$NAME/ 2>/dev/null || true
+          tar -C /tmp -czf /tmp/${NAME}.tar.gz $NAME
+          ls -lh /tmp/${NAME}.tar.gz
+          echo "TARBALL=/tmp/${NAME}.tar.gz" >> $GITHUB_ENV
+          echo "ASSET=${NAME}.tar.gz" >> $GITHUB_ENV
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ega-linux-aarch64
+          path: /tmp/ega-*-linux-aarch64.tar.gz

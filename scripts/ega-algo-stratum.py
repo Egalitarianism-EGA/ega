@@ -1,16 +1,7 @@
 #!/usr/bin/env python3
 """
-EGA shared stratum for RandomX + YespowerEGA (Bitcoin-family multi-algo).
-Uses node GBT + ega-pow-hash for real share/block verify + submitblock.
-
-Ports (default):
-  RandomX     3333
-  YespowerEGA 3335
-
-Env:
-  EGA_RPC_URL, EGA_RPC_USER, EGA_RPC_PASS (or ~/.ega/ega.conf)
-  EGA_POW_HASH  path to ega-pow-hash binary
-  EGA_STRATUM_RX_PORT  EGA_STRATUM_YP_PORT
+EGA shared stratum — RandomX :3333 + YespowerEGA :3335
+Real PoW via ega-pow-hash; worker stats + HTTP API on :3337
 """
 from __future__ import annotations
 
@@ -24,6 +15,7 @@ import subprocess
 import threading
 import time
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,10 +25,14 @@ RPC_USER = os.environ.get("EGA_RPC_USER", "")
 RPC_PASS = os.environ.get("EGA_RPC_PASS", "")
 RX_PORT = int(os.environ.get("EGA_STRATUM_RX_PORT", "3333"))
 YP_PORT = int(os.environ.get("EGA_STRATUM_YP_PORT", "3335"))
+STATS_PORT = int(os.environ.get("EGA_STRATUM_STATS_PORT", "3337"))
 HOST = os.environ.get("EGA_STRATUM_HOST", "0.0.0.0")
-
-# share difficulty: shares must be under network target * this factor (easier shares)
 SHARE_DIFF_MULT = float(os.environ.get("EGA_SHARE_DIFF_MULT", "0.001"))
+
+# worker_key -> stats
+WORKERS: dict[str, dict] = {}
+WORKERS_LOCK = threading.Lock()
+SERVERS: list = []
 
 
 def load_conf():
@@ -59,9 +55,7 @@ def load_conf():
 
 
 def rpc(method, params=None):
-    if params is None:
-        params = []
-    payload = json.dumps({"jsonrpc": "1.0", "id": "stratum", "method": method, "params": params}).encode()
+    payload = json.dumps({"jsonrpc": "1.0", "id": "s", "method": method, "params": params or []}).encode()
     req = urllib.request.Request(RPC_URL, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
     if RPC_USER or RPC_PASS:
@@ -78,15 +72,8 @@ def double_sha256(b: bytes) -> bytes:
     return hashlib.sha256(hashlib.sha256(b).digest()).digest()
 
 
-def hex_swap(h: str) -> str:
-    b = bytes.fromhex(h)
-    return b[::-1].hex()
-
-
 def pow_hash(algo: str, header80: bytes) -> bytes:
-    hx = header80.hex()
-    out = subprocess.check_output([POW_HASH, algo, hx], timeout=30).decode().strip()
-    # GetHex is display order (reversed from internal LE on some chains) — uint256 GetHex is big-endian hex
+    out = subprocess.check_output([POW_HASH, algo, header80.hex()], timeout=30).decode().strip()
     return bytes.fromhex(out)
 
 
@@ -100,11 +87,37 @@ def target_from_bits(bits_hex: str) -> int:
 
 
 def hash_to_int(h: bytes) -> int:
-    # ega-pow-hash prints uint256.GetHex() (big-endian numeric form)
     return int.from_bytes(h, "big")
 
 
+def touch_worker(algo: str, name: str, **kw):
+    key = f"{algo}:{name}"
+    with WORKERS_LOCK:
+        w = WORKERS.setdefault(
+            key,
+            {
+                "algo": algo,
+                "name": name,
+                "accepts": 0,
+                "rejects": 0,
+                "blocks": 0,
+                "connected": 0,
+                "last_share": 0,
+                "first_seen": time.time(),
+            },
+        )
+        for k, v in kw.items():
+            if k in ("accepts", "rejects", "blocks", "connected") and isinstance(v, int):
+                w[k] = w.get(k, 0) + v
+            else:
+                w[k] = v
+        return dict(w)
+
+
 class Job:
+    _payout_script = None
+    _payout_addr = None
+
     def __init__(self, algo: str, tmpl: dict, job_id: str):
         self.algo = algo
         self.tmpl = tmpl
@@ -116,11 +129,8 @@ class Job:
         self.height = tmpl["height"]
         self.target = target_from_bits(tmpl["bits"])
         self.share_target = max(1, int(self.target / SHARE_DIFF_MULT)) if SHARE_DIFF_MULT > 0 else self.target
-        # coinbase
-        cb_val = tmpl["coinbasevalue"]
-        self.coinbase_tx = self._make_coinbase(tmpl, cb_val)
+        self.coinbase_tx = self._make_coinbase(tmpl, tmpl["coinbasevalue"])
         self.merkle_root = self._merkle_root(self.coinbase_tx, tmpl.get("transactions") or [])
-        self.n1 = os.urandom(4).hex()  # extranonce1 per job template refresh actually per client
 
     def _make_coinbase(self, tmpl, value_sats: int) -> bytes:
         height = tmpl["height"]
@@ -133,33 +143,32 @@ class Job:
             hb = [0]
         height_bytes = bytes(hb)
         script_sig = bytes([len(height_bytes)]) + height_bytes + b"/EGA/"
-        script_pubkey = getattr(Job, "_payout_script", None)
-        if not script_pubkey:
+        if not Job._payout_script:
             addr = os.environ.get("EGA_POOL_PAYOUT") or rpc("getnewaddress")
             info = rpc("getaddressinfo", [addr])
-            script_pubkey = bytes.fromhex(info["scriptPubKey"])
-            Job._payout_script = script_pubkey
+            Job._payout_script = bytes.fromhex(info["scriptPubKey"])
             Job._payout_addr = addr
-            print(f"[pool] payout address {addr}")
-        parts = [
-            struct.pack("<I", 1),
-            b"\x01",
-            b"\x00" * 32,
-            struct.pack("<I", 0xFFFFFFFF),
-            bytes([len(script_sig)]) + script_sig,
-            struct.pack("<I", 0xFFFFFFFF),
-            b"\x01",
-            struct.pack("<Q", int(value_sats)),
-            bytes([len(script_pubkey)]) + script_pubkey,
-            struct.pack("<I", 0),
-        ]
-        return b"".join(parts)
+            print(f"[pool] payout {addr}")
+        spk = Job._payout_script
+        return b"".join(
+            [
+                struct.pack("<I", 1),
+                b"\x01",
+                b"\x00" * 32,
+                struct.pack("<I", 0xFFFFFFFF),
+                bytes([len(script_sig)]) + script_sig,
+                struct.pack("<I", 0xFFFFFFFF),
+                b"\x01",
+                struct.pack("<Q", int(value_sats)),
+                bytes([len(spk)]) + spk,
+                struct.pack("<I", 0),
+            ]
+        )
 
     def _merkle_root(self, coinbase: bytes, txs: list) -> bytes:
         hashes = [double_sha256(coinbase)]
         for tx in txs:
-            raw = bytes.fromhex(tx["data"])
-            hashes.append(double_sha256(raw))
+            hashes.append(double_sha256(bytes.fromhex(tx["data"])))
         while len(hashes) > 1:
             if len(hashes) % 2 == 1:
                 hashes.append(hashes[-1])
@@ -169,26 +178,18 @@ class Job:
             hashes = nxt
         return hashes[0]
 
-    def header(self, nonce: int, ntime: int | None = None, extranonce2: bytes = b"\x00" * 4) -> bytes:
-        # rebuild coinbase with extranonce2 appended in script for uniqueness
-        # For simplicity use fixed coinbase; nonce varies
+    def header(self, nonce: int, ntime: int | None = None) -> bytes:
         ver = struct.pack("<I", self.version)
         prev = bytes.fromhex(self.prevhash)[::-1]
-        merkle = self.merkle_root  # already LE internal
+        merkle = self.merkle_root
         ntime_b = struct.pack("<I", ntime if ntime is not None else self.curtime)
-        bits_b = bytes.fromhex(self.bits)[::-1] if len(self.bits) == 8 else struct.pack("<I", int(self.bits, 16))
-        # bits in header is 4 bytes LE of the compact bits value
         bits_b = struct.pack("<I", int(self.bits, 16))
         nonce_b = struct.pack("<I", nonce & 0xFFFFFFFF)
         return ver + prev + merkle + ntime_b + bits_b + nonce_b
 
     def block_hex(self, header: bytes) -> str:
         tx_count = 1 + len(self.tmpl.get("transactions") or [])
-        # varint
-        if tx_count < 0xFD:
-            vtx = bytes([tx_count])
-        else:
-            vtx = b"\xfd" + struct.pack("<H", tx_count)
+        vtx = bytes([tx_count]) if tx_count < 0xFD else b"\xfd" + struct.pack("<H", tx_count)
         body = header + vtx + self.coinbase_tx
         for tx in self.tmpl.get("transactions") or []:
             body += bytes.fromhex(tx["data"])
@@ -203,15 +204,13 @@ class AlgoStratum(threading.Thread):
         self.job: Job | None = None
         self.job_lock = threading.Lock()
         self.job_counter = 0
-        self.stats = {"accepts": 0, "rejects": 0, "blocks": 0, "connections": 0}
+        self.stats = {"accepts": 0, "rejects": 0, "blocks": 0, "active": 0}
 
     def refresh_job(self):
-        # EGA/DigiByte-style: template request + algo name
         try:
             tmpl = rpc("getblocktemplate", [{"rules": ["segwit"]}, self.algo])
         except Exception:
             tmpl = rpc("getblocktemplate", [{"rules": ["segwit"]}])
-            # force version bits for algo if node ignored second arg
         if not isinstance(tmpl, dict):
             raise RuntimeError("bad template")
         self.job_counter += 1
@@ -221,31 +220,30 @@ class AlgoStratum(threading.Thread):
         return self.job
 
     def run(self):
-        print(f"[stratum] {self.algo} listening on {HOST}:{self.port}")
+        print(f"[stratum] {self.algo} :{self.port}")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind((HOST, self.port))
-        sock.listen(50)
+        sock.listen(100)
         while True:
             c, addr = sock.accept()
-            self.stats["connections"] += 1
             threading.Thread(target=self.handle_client, args=(c, addr), daemon=True).start()
 
     def handle_client(self, conn: socket.socket, addr):
         extranonce1 = os.urandom(4).hex()
-        worker = "unknown"
+        worker = f"anon-{addr[0]}"
+        self.stats["active"] += 1
+        touch_worker(self.algo, worker, connected=1)
         buf = b""
         try:
-            conn.settimeout(600)
-            # initial job
+            conn.settimeout(300)
             try:
                 job = self.refresh_job()
             except Exception as e:
-                print(f"[{self.algo}] GBT fail: {e}")
-                conn.close()
+                print(f"[{self.algo}] GBT: {e}")
                 return
             while True:
-                data = conn.recv(4096)
+                data = conn.recv(8192)
                 if not data:
                     break
                 buf += data
@@ -262,38 +260,44 @@ class AlgoStratum(threading.Thread):
                     method = msg.get("method")
                     params = msg.get("params") or []
                     if method == "mining.subscribe":
-                        # [[notifications], extranonce1, extranonce2_size]
-                        self.send(conn, {"id": mid, "result": [[["mining.notify", "ega"]], extranonce1, 4], "error": None})
-                        self.push_job(conn, job, force=True)
+                        self.send(
+                            conn,
+                            {"id": mid, "result": [[["mining.notify", "ega"]], extranonce1, 4], "error": None},
+                        )
+                        self.push_job(conn, job)
                     elif method == "mining.authorize":
                         worker = str(params[0]) if params else worker
+                        touch_worker(self.algo, worker, connected=0)  # name change; track new
+                        touch_worker(self.algo, worker)
                         self.send(conn, {"id": mid, "result": True, "error": None})
-                        self.push_job(conn, job, force=True)
+                        self.push_job(conn, job)
                     elif method == "mining.submit":
-                        # worker, job_id, extranonce2, ntime, nonce
-                        ok, detail = self.process_submit(params, extranonce1)
+                        ok, detail = self.process_submit(params, worker)
                         if ok:
                             self.stats["accepts"] += 1
+                            touch_worker(self.algo, worker, accepts=1, last_share=time.time())
                             self.send(conn, {"id": mid, "result": True, "error": None})
                             if detail == "block":
                                 self.stats["blocks"] += 1
-                                print(f"[{self.algo}] BLOCK from {worker}")
+                                touch_worker(self.algo, worker, blocks=1)
+                                print(f"[{self.algo}] BLOCK {worker}")
                                 try:
                                     job = self.refresh_job()
-                                    self.push_job(conn, job, force=True)
+                                    self.push_job(conn, job)
                                 except Exception as e:
-                                    print(f"[{self.algo}] refresh after block: {e}")
+                                    print(f"[{self.algo}] refresh: {e}")
                         else:
                             self.stats["rejects"] += 1
+                            touch_worker(self.algo, worker, rejects=1, last_share=time.time())
                             self.send(conn, {"id": mid, "result": None, "error": [21, detail, None]})
                     elif method == "mining.extranonce.subscribe":
                         self.send(conn, {"id": mid, "result": True, "error": None})
-                    else:
-                        if mid is not None:
-                            self.send(conn, {"id": mid, "result": None, "error": [20, f"unknown {method}", None]})
+                    elif mid is not None:
+                        self.send(conn, {"id": mid, "result": None, "error": [20, f"unknown {method}", None]})
         except Exception as e:
-            print(f"[{self.algo}] client {addr}: {e}")
+            print(f"[{self.algo}] {addr}: {e}")
         finally:
+            self.stats["active"] = max(0, self.stats["active"] - 1)
             try:
                 conn.close()
             except Exception:
@@ -302,73 +306,107 @@ class AlgoStratum(threading.Thread):
     def send(self, conn, obj):
         conn.sendall((json.dumps(obj) + "\n").encode())
 
-    def push_job(self, conn, job: Job, force=False):
-        # mining.notify params for bitcoin-style:
-        # job_id, prevhash, coinb1, coinb2, merkle_branch[], version, nbits, ntime, clean
-        prev = hex_swap(job.prevhash)
-        # dummy coinbase split (we use fixed coinbase; miner nonce only)
+    def push_job(self, conn, job: Job):
+        prev = bytes.fromhex(job.prevhash)[::-1].hex()
         cb = job.coinbase_tx.hex()
         mid = len(cb) // 2
-        coinb1, coinb2 = cb[:mid], cb[mid:]
-        version = f"{job.version:08x}"
-        nbits = job.bits
-        ntime = f"{job.curtime:08x}"
         self.send(
             conn,
             {
                 "id": None,
                 "method": "mining.notify",
-                "params": [job.job_id, prev, coinb1, coinb2, [], version, nbits, ntime, True],
+                "params": [
+                    job.job_id,
+                    prev,
+                    cb[:mid],
+                    cb[mid:],
+                    [],
+                    f"{job.version:08x}",
+                    job.bits,
+                    f"{job.curtime:08x}",
+                    True,
+                ],
             },
         )
-        # set difficulty — share target relative
-        # mining.set_difficulty: network is easy so use small number
         self.send(conn, {"id": None, "method": "mining.set_difficulty", "params": [0.01]})
 
-    def process_submit(self, params, extranonce1: str):
+    def process_submit(self, params, worker: str):
         if len(params) < 5:
             return False, "bad params"
-        job_id, en2, ntime_hex, nonce_hex = params[1], params[2], params[3], params[4]
+        job_id, _en2, ntime_hex, nonce_hex = params[1], params[2], params[3], params[4]
         with self.job_lock:
             job = self.job
-        if not job or job.job_id != job_id:
-            # still try with current job
-            if not job:
-                return False, "no job"
+        if not job:
+            return False, "no job"
         try:
             nonce = int(nonce_hex, 16)
             ntime = int(ntime_hex, 16)
         except Exception:
-            return False, "bad nonce/ntime"
+            return False, "bad nonce"
         header = job.header(nonce, ntime)
         try:
             h = pow_hash(self.algo, header)
         except Exception as e:
-            return False, f"pow fail: {e}"
+            return False, f"pow:{e}"
         hv = hash_to_int(h)
         if hv >= job.share_target and hv >= job.target:
             return False, "above target"
-        # block?
         if hv < job.target:
-            blk = job.block_hex(header)
             try:
-                res = rpc("submitblock", [blk])
-                if res is None or res == "":
+                res = rpc("submitblock", [job.block_hex(header)])
+                if res in (None, ""):
                     return True, "block"
-                # some nodes return null on success
-                if res is None:
-                    return True, "block"
-                return True, f"block-submit:{res}"
+                return True, f"share:{res}"
             except Exception as e:
-                # share still valid even if submit fails
-                return True, f"share-block-err:{e}"
+                return True, f"share:{e}"
         return True, "share"
 
 
-def job_refresher(servers: list[AlgoStratum]):
+def stats_snapshot():
+    with WORKERS_LOCK:
+        workers = sorted(WORKERS.values(), key=lambda w: -w.get("accepts", 0))
+    pools = []
+    for s in SERVERS:
+        pools.append(
+            {
+                "algo": s.algo,
+                "port": s.port,
+                "accepts": s.stats["accepts"],
+                "rejects": s.stats["rejects"],
+                "blocks": s.stats["blocks"],
+                "active_connections": s.stats["active"],
+            }
+        )
+    return {
+        "pools": pools,
+        "workers": workers[:100],
+        "payout_address": Job._payout_addr,
+        "ts": time.time(),
+    }
+
+
+class StatsHTTP(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        if self.path.startswith("/api/"):
+            body = json.dumps(stats_snapshot()).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+
+def job_refresher():
     while True:
-        time.sleep(15)
-        for s in servers:
+        time.sleep(20)
+        for s in SERVERS:
             try:
                 s.refresh_job()
             except Exception as e:
@@ -376,32 +414,21 @@ def job_refresher(servers: list[AlgoStratum]):
 
 
 def main():
+    global SERVERS
     load_conf()
     if not Path(POW_HASH).is_file():
-        raise SystemExit(f"missing {POW_HASH} — build: make -C src ega-pow-hash")
-    # init payout script
-    try:
-        rpc("getblockchaininfo")
-    except Exception as e:
-        raise SystemExit(f"node RPC failed: {e}")
-
-    servers = [
-        AlgoStratum("randomx", RX_PORT),
-        AlgoStratum("yespower-ega", YP_PORT),
-    ]
-    for s in servers:
+        raise SystemExit(f"missing {POW_HASH}")
+    rpc("getblockchaininfo")
+    SERVERS = [AlgoStratum("randomx", RX_PORT), AlgoStratum("yespower-ega", YP_PORT)]
+    for s in SERVERS:
         try:
             s.refresh_job()
         except Exception as e:
-            print(f"[{s.algo}] initial GBT: {e}")
+            print(f"[{s.algo}] GBT: {e}")
         s.start()
-    threading.Thread(target=job_refresher, args=(servers,), daemon=True).start()
-    print(f"EGA shared stratum RandomX :{RX_PORT}  YespowerEGA :{YP_PORT}")
-    print(f"pow-hash: {POW_HASH}")
-    while True:
-        time.sleep(60)
-        for s in servers:
-            print(f"[{s.algo}] stats {s.stats}")
+    threading.Thread(target=job_refresher, daemon=True).start()
+    print(f"RandomX :{RX_PORT}  YespowerEGA :{YP_PORT}  stats :{STATS_PORT}/api/")
+    ThreadingHTTPServer((HOST, STATS_PORT), StatsHTTP).serve_forever()
 
 
 if __name__ == "__main__":

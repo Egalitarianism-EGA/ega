@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,6 +17,7 @@ from urllib.parse import parse_qs, urlparse
 HOST = os.environ.get("EGA_POOL_UI_HOST", "0.0.0.0")
 PORT = int(os.environ.get("EGA_POOL_UI_PORT", "8089"))
 API_BASE = os.environ.get("EGA_POOL_API_BASE", "http://127.0.0.1:4000").rstrip("/")
+STRATUM_STATS = os.environ.get("EGA_STRATUM_STATS", "http://127.0.0.1:3337").rstrip("/")
 RPC_URL = os.environ.get("EGA_RPC_URL", "http://127.0.0.1:20202")
 PUBLIC = os.environ.get("EGA_PUBLIC_HOST", "105.225.100.58")
 EXPLORER = os.environ.get("EGA_EXPLORER_URL", f"http://{PUBLIC}:8088")
@@ -177,7 +179,7 @@ def layout(title, active, body):
   <div class="logo">EGA <span>Pool</span></div>
   <nav class="nav">
     {n("Home","/")}{n("Start","/start")}{n("Solo","/solo")}{n("Shared","/shared")}
-    {n("Blocks","/blocks")}{n("Wallet","/wallet")}
+    {n("Blocks","/blocks")}{n("Workers","/workers")}{n("Payments","/payments")}{n("Wallet","/wallet")}
     <a href="{esc(EXPLORER)}" target="_blank">Explorer</a>
   </nav>
 </header>
@@ -427,6 +429,107 @@ def page_blocks():
     return layout("Blocks", "Blocks", body)
 
 
+def load_stratum_stats():
+    try:
+        with urllib.request.urlopen(f"{STRATUM_STATS}/api/", timeout=5) as r:
+            return json.loads(r.read().decode()), None
+    except Exception as e:
+        return None, str(e)
+
+
+def page_workers():
+    parts = []
+    st, err = load_stratum_stats()
+    if err:
+        parts.append(f'<div class="note">RX/YP stratum: offline ({esc(err)})</div>')
+    else:
+        pools = (st or {}).get("pools") or []
+        workers = (st or {}).get("workers") or []
+        prow = "".join(
+            f"<tr><td>{esc(p.get('algo'))}</td><td>{esc(p.get('port'))}</td>"
+            f"<td>{esc(p.get('active_connections'))}</td><td>{esc(p.get('accepts'))}</td>"
+            f"<td>{esc(p.get('rejects'))}</td><td>{esc(p.get('blocks'))}</td></tr>"
+            for p in pools
+        )
+        wrows = "".join(
+            f"<tr><td class='mono'>{esc(w.get('name'))}</td><td>{esc(w.get('algo'))}</td>"
+            f"<td>{esc(w.get('accepts'))}</td><td>{esc(w.get('rejects'))}</td>"
+            f"<td>{esc(w.get('blocks'))}</td>"
+            f"<td>{esc(int(time.time()-w['last_share']) if w.get('last_share') else '—')}s</td></tr>"
+            for w in workers
+        )
+        pay = esc((st or {}).get("payout_address") or "—")
+        parts.append(
+            f"""<div class="card"><h2>CPU stratum (RandomX · YespowerEGA)</h2>
+            <table><tr><th>Algo</th><th>Port</th><th>Active</th><th>Accepts</th><th>Rejects</th><th>Blocks</th></tr>
+            {prow or '<tr><td colspan="6" style="color:var(--muted)">—</td></tr>'}</table>
+            <p style="color:var(--muted);font-size:.85rem;margin-top:.5rem">Pool coinbase address: <span class="mono">{pay}</span></p>
+            <h2 style="margin-top:1rem">Workers</h2>
+            <table><tr><th>Worker / address</th><th>Algo</th><th>Accepts</th><th>Rejects</th><th>Blocks</th><th>Last share</th></tr>
+            {wrows or '<tr><td colspan="6" style="color:var(--muted)">No workers yet — connect a miner.</td></tr>'}
+            </table></div>"""
+        )
+
+    for a in ALGOS:
+        if not a.get("mc"):
+            continue
+        data, e2 = api(f"/api/pools/{a['mc']}/miners")
+        rows = ""
+        if isinstance(data, list) and data:
+            for m in data[:50]:
+                name = m.get("miner") or m.get("address") or m.get("name") or json.dumps(m)[:40]
+                rows += f"<tr><td class='mono'>{esc(name)}</td><td class='mono'>{esc(str(m)[:80])}</td></tr>"
+        else:
+            rows = f'<tr><td colspan="2" style="color:var(--muted)">No Miningcore workers yet ({esc(e2 or "empty")}).</td></tr>'
+        parts.append(
+            f"""<div class="card"><h2>{esc(a['name'])} · Miningcore workers</h2>
+            <table><tr><th>Miner</th><th>Info</th></tr>{rows}</table></div>"""
+        )
+
+    body = f"""
+<h1>Workers</h1>
+<p class="sub">Who is connected and submitting shares.</p>
+{''.join(parts)}
+"""
+    return layout("Workers", "Workers", body)
+
+
+def page_payments():
+    parts = []
+    for a in ALGOS:
+        if not a.get("mc"):
+            parts.append(
+                f"""<div class="card"><h2>{esc(a['name'])}</h2>
+                <p style="color:var(--muted)">EGA stratum pays pool coinbase to the node wallet when blocks are found.
+                Per-share accounting is tracked under Workers; mature funds sit in the pool address until operator pays out
+                (or use solo to get full block to your address).</p></div>"""
+            )
+            continue
+        data, err = api(f"/api/pools/{a['mc']}/payments")
+        rows = ""
+        if isinstance(data, list) and data:
+            for p in data[:40]:
+                rows += (
+                    f"<tr><td class='mono'>{esc(p.get('address', p.get('created','')))}</td>"
+                    f"<td>{esc(p.get('amount', p.get('amountFormatted','')))}</td>"
+                    f"<td class='mono'>{esc(str(p.get('transactionConfirmationData', p.get('id','')))[:48])}</td></tr>"
+                )
+        else:
+            rows = f'<tr><td colspan="3" style="color:var(--muted)">{esc(err or "No payments recorded yet.")}</td></tr>'
+        parts.append(
+            f"""<div class="card"><h2>{esc(a['name'])} · payments</h2>
+            <table><tr><th>Address / time</th><th>Amount</th><th>Tx / id</th></tr>{rows}</table></div>"""
+        )
+    body = f"""
+<h1>Payments</h1>
+<p class="sub">Shared-pool payouts. Solo rewards go straight to your wallet on the explorer.</p>
+<div class="note">Miningcore records payments when payment processing runs. Empty tables mean no automated payouts yet —
+connect miners and find blocks, or solo-mine to your own address.</div>
+{''.join(parts)}
+"""
+    return layout("Payments", "Payments", body)
+
+
 def page_wallet(addr=""):
     addr = (addr or "").strip()
     form = f"""<form class="search" method="get" action="/wallet">
@@ -492,6 +595,10 @@ class H(BaseHTTPRequestHandler):
                 body = page_shared()
             elif path == "/blocks":
                 body = page_blocks()
+            elif path == "/workers":
+                body = page_workers()
+            elif path == "/payments":
+                body = page_payments()
             elif path == "/wallet":
                 body = page_wallet((q.get("address") or [""])[0])
             else:
