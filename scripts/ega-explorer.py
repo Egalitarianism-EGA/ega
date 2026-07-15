@@ -467,6 +467,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_html(200, layout("Block", self._block(path[len("/block/") :])))
         elif path.startswith("/tx/"):
             self.send_html(200, layout("Transaction", self._tx(path[len("/tx/") :])))
+        elif path.startswith("/address/"):
+            self.send_html(200, layout("Address", self._address(path[len("/address/") :])))
         elif path == "/search":
             self.send_html(200, layout("Search", self._search((q.get("q") or [""])[0].strip())))
         else:
@@ -475,7 +477,7 @@ class Handler(BaseHTTPRequestHandler):
     def _search_form(self, value: str = "") -> str:
         return f"""
 <form class="search" action="/search" method="get">
-  <input type="text" name="q" value="{esc(value)}" placeholder="Height, block hash, or transaction id" />
+  <input type="text" name="q" value="{esc(value)}" placeholder="Height, block/tx hash, or wallet address (E…)" />
   <button type="submit">Search</button>
 </form>"""
 
@@ -622,12 +624,31 @@ class Handler(BaseHTTPRequestHandler):
         txs = b.get("tx", [])
         algo = b.get("pow_algo") or b.get("algo") or "—"
         rew = subsidy_at(int(height) if height is not None else 0)
-        # coinbase total if available
+        # Coinbase reward distribution (who got the block subsidy)
         coinbase_val = None
-        if height and height > 0 and txs:
+        reward_rows = []
+        if height is not None and height > 0 and txs:
             try:
                 tx = rpc("getrawtransaction", [txs[0], True])
-                coinbase_val = sum(float(o.get("value") or 0) for o in tx.get("vout", []))
+                coinbase_val = 0.0
+                for o in tx.get("vout", []):
+                    val = float(o.get("value") or 0)
+                    coinbase_val += val
+                    spk = o.get("scriptPubKey") or {}
+                    addrs = spk.get("addresses") or ([spk["address"]] if spk.get("address") else [])
+                    if spk.get("type") == "nulldata" or val == 0 and not addrs:
+                        continue
+                    if addrs:
+                        for a in addrs:
+                            reward_rows.append(
+                                f"<tr><td class='mono'><a href='/address/{esc(a)}'>{esc(a)}</a></td>"
+                                f"<td class='right mono'><strong>{esc(fmt_ega(val))}</strong> EGA</td></tr>"
+                            )
+                    else:
+                        reward_rows.append(
+                            f"<tr><td class='muted'>{esc(spk.get('type','output'))}</td>"
+                            f"<td class='right mono'>{esc(fmt_ega(val))} EGA</td></tr>"
+                        )
             except Exception:
                 pass
 
@@ -639,7 +660,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             elif i == 0:
                 tx_items.append(
-                    f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a> <span class="badge">coinbase</span></li>'
+                    f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a> <span class="badge">coinbase · block reward</span></li>'
                 )
             else:
                 tx_items.append(f'<li class="mono"><a href="/tx/{esc(t)}">{esc(t)}</a></li>')
@@ -656,7 +677,7 @@ class Handler(BaseHTTPRequestHandler):
             ("PoW hash", b.get("pow_hash")),
             ("Time", fmt_time(b.get("time"))),
             ("Algorithm", algo),
-            ("Block reward", reward_line),
+            ("Block reward (subsidy)", reward_line),
             ("Difficulty", fmt_diff(b.get("difficulty"))),
             ("Nonce", b.get("nonce")),
             ("Bits", b.get("bits")),
@@ -676,6 +697,20 @@ class Handler(BaseHTTPRequestHandler):
             pager.append(f'<a href="/block/{esc(prev)}">← Previous</a>')
         if nxt:
             pager.append(f'<a href="/block/{esc(nxt)}">Next →</a>')
+        reward_table = ""
+        if reward_rows:
+            reward_table = f"""
+<div class="card">
+  <div class="card-h"><h2>Miner reward distribution</h2><span class="muted">coinbase outputs</span></div>
+  <table>
+    <tr><th>Address (wallet)</th><th class="right">Amount</th></tr>
+    {''.join(reward_rows)}
+  </table>
+</div>"""
+        elif height == 0:
+            reward_table = """
+<div class="note">Genesis has <strong>0 EGA</strong> reward (fair launch / no premine).</div>"""
+
         return f"""
 <div class="crumbs"><a href="/">Overview</a> / Block {esc(height)}</div>
 <h1>Block {esc(height)}</h1>
@@ -686,6 +721,7 @@ class Handler(BaseHTTPRequestHandler):
   <table class="kv">{rows}</table>
   <div class="pager">{' · '.join(pager) if pager else '<span class="muted">—</span>'}</div>
 </div>
+{reward_table}
 <div class="card">
   <div class="card-h"><h2>Transactions</h2><span class="muted">{len(txs)}</span></div>
   <ul class="tx">{''.join(tx_items) or '<li class="muted">None</li>'}</ul>
@@ -741,14 +777,21 @@ class Handler(BaseHTTPRequestHandler):
         for o in vouts:
             spk = o.get("scriptPubKey") or {}
             addrs = spk.get("addresses") or ([spk["address"]] if spk.get("address") else [])
-            dest = ", ".join(addrs) if addrs else spk.get("type", "—")
+            if addrs:
+                dest = ", ".join(
+                    f"<a href='/address/{esc(a)}' class='mono'>{esc(a)}</a>" for a in addrs
+                )
+            else:
+                dest = f"<span class='mono'>{esc(spk.get('type', '—'))}</span>"
             vout_html.append(
-                f"<li><strong>{esc(o.get('value',''))}</strong> EGA → <span class='mono'>{esc(dest)}</span></li>"
+                f"<li><strong>{esc(fmt_ega(float(o.get('value') or 0)))}</strong> EGA → {dest}</li>"
             )
+        is_cb = any("coinbase" in v for v in vins)
         return f"""
 <div class="crumbs"><a href="/">Overview</a> / Transaction</div>
 <h1>Transaction</h1>
 {self._search_form(txid)}
+{"<div class='note'><strong>Coinbase</strong> — this is the block reward (miner payout). Amounts below are what the wallet received.</div>" if is_cb else ""}
 <div class="card"><table class="kv">
 <tr><th>Txid</th><td class="mono">{esc(tx.get("txid", txid))}</td></tr>
 <tr><th>Block</th><td class="mono"><a href="/block/{esc(tx.get('blockhash',''))}">{esc(tx.get('blockhash',''))}</a></td></tr>
@@ -762,14 +805,129 @@ class Handler(BaseHTTPRequestHandler):
   <ul class="tx">{''.join(vin_html) or '<li class="muted">—</li>'}</ul>
 </div>
 <div class="card">
-  <div class="card-h"><h2>Outputs</h2></div>
+  <div class="card-h"><h2>Outputs (reward / payments)</h2></div>
   <ul class="tx">{''.join(vout_html) or '<li class="muted">—</li>'}</ul>
+</div>
+"""
+
+    def _address(self, addr: str) -> str:
+        """Scan chain for address activity (fine on early chain; needs txindex for non-wallet txs)."""
+        addr = addr.strip()
+        # Validate if node supports it
+        try:
+            va = rpc("validateaddress", [addr])
+            if va.get("isvalid") is False:
+                return f"{self._search_form(addr)}<div class='err'>Invalid EGA address.</div>"
+        except Exception:
+            pass
+
+        received = 0.0
+        sent_est = 0.0
+        rows = []
+        height = int(rpc("getblockcount"))
+        # Scan all blocks — OK at early heights; cap protection
+        max_h = min(height, 50000)
+        for h in range(1, max_h + 1):
+            try:
+                bh = rpc("getblockhash", [h])
+                b = rpc("getblock", [bh, 2])  # verbosity 2 includes tx objects when supported
+            except Exception:
+                try:
+                    bh = rpc("getblockhash", [h])
+                    b = rpc("getblock", [bh])
+                    txids = b.get("tx") or []
+                    txs_detail = []
+                    for tid in txids:
+                        try:
+                            txs_detail.append(rpc("getrawtransaction", [tid, True]))
+                        except Exception:
+                            continue
+                    b = dict(b)
+                    b["_txs"] = txs_detail
+                except Exception:
+                    continue
+            txs = b.get("tx") or []
+            # verbosity 2: tx is list of objects; verbosity 1: list of ids
+            if txs and isinstance(txs[0], str):
+                detailed = b.get("_txs") or []
+                if not detailed:
+                    detailed = []
+                    for tid in txs:
+                        try:
+                            detailed.append(rpc("getrawtransaction", [tid, True]))
+                        except Exception:
+                            pass
+                txs = detailed
+            for tx in txs:
+                if not isinstance(tx, dict):
+                    continue
+                tid = tx.get("txid") or ""
+                hit = False
+                recv_here = 0.0
+                for o in tx.get("vout") or []:
+                    spk = o.get("scriptPubKey") or {}
+                    addrs = spk.get("addresses") or ([spk["address"]] if spk.get("address") else [])
+                    if addr in addrs:
+                        hit = True
+                        v = float(o.get("value") or 0)
+                        recv_here += v
+                        received += v
+                if hit:
+                    rows.append(
+                        f"<tr><td>{h}</td>"
+                        f"<td class='mono'><a href='/tx/{esc(tid)}'>{esc(short(tid, 8))}</a></td>"
+                        f"<td class='right mono'>+{esc(fmt_ega(recv_here))}</td>"
+                        f"<td class='muted'>{esc(fmt_time(tx.get('time') or b.get('time')))}</td></tr>"
+                    )
+
+        tip = height
+        # Spendable estimate: cannot know UTXO set without scantxoutset
+        utxo_total = None
+        try:
+            sc = rpc("scantxoutset", ["start", [f"addr({addr})"]])
+            utxo_total = float(sc.get("total_amount") or 0)
+        except Exception:
+            try:
+                # some nodes use different descriptor form
+                sc = rpc("scantxoutset", ["start", [{"desc": f"addr({addr})"}]])
+                utxo_total = float(sc.get("total_amount") or 0)
+            except Exception:
+                utxo_total = None
+
+        bal_line = (
+            f"<strong>{fmt_ega(utxo_total)}</strong> EGA (unspent, scantxoutset)"
+            if utxo_total is not None
+            else f"received-in-scan <strong>{fmt_ega(received)}</strong> EGA (not full UTXO balance)"
+        )
+        return f"""
+<div class="crumbs"><a href="/">Overview</a> / Address</div>
+<h1>Address</h1>
+{self._search_form(addr)}
+<div class="card"><table class="kv">
+<tr><th>Address</th><td class="mono">{esc(addr)}</td></tr>
+<tr><th>Balance</th><td>{bal_line}</td></tr>
+<tr><th>Received (scan)</th><td class="mono">{esc(fmt_ega(received))} EGA across {len(rows)} txs</td></tr>
+<tr><th>Chain height</th><td>{esc(tip)}</td></tr>
+</table></div>
+<div class="note">
+  Lightweight explorer: scans the chain for this address (fine while the chain is small).
+  Full Bitcoin-style address indexes (Blockbook) can come later for huge chains.
+</div>
+<div class="card">
+  <div class="card-h"><h2>Transactions involving this address</h2><span class="muted">{len(rows)}</span></div>
+  <table>
+    <tr><th>Height</th><th>Tx</th><th class="right">Received</th><th>Time</th></tr>
+    {''.join(reversed(rows)) or '<tr><td colspan="4" class="muted">No outputs found for this address in scanned blocks.</td></tr>'}
+  </table>
 </div>
 """
 
     def _search(self, term: str) -> str:
         if not term:
-            return f"<h1>Search</h1>{self._search_form()}<p class='muted'>Enter a height, block hash, or txid.</p>"
+            return (
+                f"<h1>Search</h1>{self._search_form()}"
+                f"<p class='muted'>Height, block hash, txid, or <strong>wallet address</strong> (starts with E).</p>"
+            )
         if re.fullmatch(r"\d+", term):
             return self._block(term)
         if re.fullmatch(r"[0-9a-fA-F]{64}", term):
@@ -778,7 +936,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._block(term)
             except Exception:
                 return self._tx(term)
-        return f"{self._search_form(term)}<div class='err'>Unrecognized query. Use height, 64-char block hash, or txid.</div>"
+        # EGA base58 addresses typically start with E (pubkey version 33)
+        if re.fullmatch(r"[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{26,64}", term):
+            return self._address(term)
+        return (
+            f"{self._search_form(term)}"
+            f"<div class='err'>Unrecognized. Use height, block/txid hex, or an EGA address.</div>"
+        )
 
 
 def main():
