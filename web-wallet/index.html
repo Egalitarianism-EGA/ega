@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>EGA Web Wallet (light)</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#151b24; --line:#2a3444; --text:#e8eef7; --muted:#8b9bb0; --accent:#3dd6c6; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 420px; margin: 0 auto; padding: 1rem 1rem 2.5rem; }
+    h1 { font-size: 1.35rem; margin: 0.5rem 0; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; margin: 0 0 0.85rem; }
+    label { display: block; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem; }
+    input, textarea { width: 100%; background: #0a1018; border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 0.65rem 0.75rem; font-size: 0.95rem; }
+    button { width: 100%; margin-top: 0.65rem; background: var(--accent); color: #042f2e; border: 0; border-radius: 10px; padding: 0.75rem; font-weight: 750; font-size: 1rem; }
+    button.secondary { background: transparent; border: 1px solid var(--line); color: var(--text); }
+    .bal { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; }
+    .note { font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
+    .err { color: #fecaca; font-size: 0.9rem; margin-top: 0.5rem; }
+    .ok { color: #3dd68c; font-size: 0.9rem; margin-top: 0.5rem; }
+    code { font-size: 0.8rem; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>EGA light wallet</h1>
+    <p class="sub">Phone / tablet friendly shell. Connects to <strong>your</strong> node RPC (not public internet). Scaffold for accessibility — not a custodian.</p>
+
+    <div class="card">
+      <label>Node RPC URL</label>
+      <input id="rpc" value="http://127.0.0.1:20202" />
+      <label style="margin-top:0.65rem">RPC user</label>
+      <input id="user" value="ega" autocomplete="username" />
+      <label style="margin-top:0.65rem">RPC password</label>
+      <input id="pass" type="password" autocomplete="current-password" />
+      <button type="button" id="btnConnect">Connect</button>
+      <div id="connMsg" class="note" style="margin-top:0.65rem"></div>
+    </div>
+
+    <div class="card">
+      <label>Balance</label>
+      <div class="bal" id="bal">—</div>
+      <div class="note" id="balDetail">Immature rewards need confirmations before they spend.</div>
+      <button type="button" class="secondary" id="btnRefresh">Refresh</button>
+    </div>
+
+    <div class="card">
+      <label>Receive address</label>
+      <code id="addr">—</code>
+      <button type="button" class="secondary" id="btnNew">New address</button>
+    </div>
+
+    <div class="card">
+      <label>Send to address</label>
+      <input id="to" placeholder="E…" />
+      <label style="margin-top:0.65rem">Amount (EGA)</label>
+      <input id="amount" type="number" step="any" min="0" placeholder="10" />
+      <button type="button" id="btnSend">Send</button>
+      <div id="sendMsg"></div>
+    </div>
+
+    <div class="card note">
+      <strong>Security:</strong> Only use RPC on localhost or a trusted VPN/Tailscale to your home node.
+      Never put your rpcpassword on a public website host.
+      Production mobile app will use a light server protocol — this page is the first step for “poor device” access.
+      <br/><br/>
+      Mining on Android (Yespower/RandomX) will ship as a separate worker app pointing at pool or solo.
+    </div>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    async function rpc(method, params = []) {
+      const url = $("rpc").value.replace(/\/$/, "");
+      const user = $("user").value;
+      const pass = $("pass").value;
+      const auth = btoa(user + ":" + pass);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Basic " + auth,
+        },
+        body: JSON.stringify({ jsonrpc: "1.0", id: "ega-web", method, params }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      return data.result;
+    }
+    async function connect() {
+      $("connMsg").textContent = "Connecting…";
+      $("connMsg").className = "note";
+      try {
+        const info = await rpc("getblockchaininfo");
+        $("connMsg").textContent = "Connected · " + info.chain + " · height " + info.blocks;
+        $("connMsg").className = "ok";
+        await refresh();
+      } catch (e) {
+        $("connMsg").textContent = "Failed: " + e.message + " (browsers block cross-origin RPC unless you proxy; use localhost or a local proxy.)";
+        $("connMsg").className = "err";
+      }
+    }
+    async function refresh() {
+      try {
+        const w = await rpc("getwalletinfo");
+        $("bal").textContent = (w.balance || 0) + " EGA";
+        $("balDetail").textContent = "Unconfirmed: " + (w.unconfirmed_balance || 0) + " · Immature: " + (w.immature_balance || 0);
+      } catch (e) {
+        $("bal").textContent = "—";
+        $("balDetail").textContent = e.message;
+      }
+    }
+    async function newAddr() {
+      try {
+        $("addr").textContent = await rpc("getnewaddress");
+      } catch (e) {
+        $("addr").textContent = e.message;
+      }
+    }
+    async function send() {
+      $("sendMsg").className = "note";
+      $("sendMsg").textContent = "Sending…";
+      try {
+        const txid = await rpc("sendtoaddress", [$("to").value.trim(), parseFloat($("amount").value)]);
+        $("sendMsg").className = "ok";
+        $("sendMsg").textContent = "Sent · txid " + txid;
+        await refresh();
+      } catch (e) {
+        $("sendMsg").className = "err";
+        $("sendMsg").textContent = e.message;
+      }
+    }
+    $("btnConnect").onclick = connect;
+    $("btnRefresh").onclick = refresh;
+    $("btnNew").onclick = newAddr;
+    $("btnSend").onclick = send;
+  </script>
+</body>
+</html>

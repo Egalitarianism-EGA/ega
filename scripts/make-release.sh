@@ -22,10 +22,16 @@ cp -a src/egad src/ega-cli "$OUT/bin/"
 cp -a scripts/easy-start.sh scripts/easy-wallet.sh scripts/easy-mine.sh \
   scripts/ega-explorer.sh scripts/ega-explorer.py \
   scripts/ega-pool.sh scripts/ega-pool.py \
+  scripts/ega-pool-ui.sh scripts/ega-pool-dashboard.py \
+  scripts/low-power-mine.sh scripts/use-ega-cli.sh \
   scripts/install-desktop-apps.sh \
   "$OUT/scripts/" 2>/dev/null || true
 
-cp docs/ega/getting-started.md docs/ega/params.md "$OUT/docs/" 2>/dev/null || true
+cp docs/ega/getting-started.md docs/ega/params.md docs/ega/ACCESSIBILITY-ROADMAP.md \
+  docs/ega/FREE-HOME-SEED.md \
+  "$OUT/docs/" 2>/dev/null || true
+mkdir -p "$OUT/web-wallet"
+cp -a web-wallet/index.html "$OUT/web-wallet/" 2>/dev/null || true
 cp README.md "$OUT/" 2>/dev/null || true
 
 cat > "$OUT/README-RELEASE.txt" << EOF
