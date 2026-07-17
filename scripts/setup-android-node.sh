@@ -2,7 +2,7 @@
 # Prepare a light/pruned EGA node config (Android Termux, Pi, weak PC).
 # Usage: bash scripts/setup-android-node.sh [seed_ip]
 set -euo pipefail
-SEED="${1:-105.225.100.58}"
+SEED="${1:-105.225.132.175}"
 DATADIR="${EGA_DATADIR:-$HOME/.ega}"
 mkdir -p "$DATADIR"
 CONF="$DATADIR/ega.conf"

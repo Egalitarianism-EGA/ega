@@ -84,7 +84,7 @@ rpcallowip=127.0.0.1
 rpcport=20202
 port=20201
 
-addnode=105.225.100.58:20201
+addnode=105.225.132.175:20201
 algo=yespower-ega
 ```
 
@@ -93,7 +93,7 @@ Save: Ctrl+O, Enter, Ctrl+X.
 Or from the repo (if script is present):
 
 ```bash
-bash scripts/setup-android-node.sh 105.225.100.58
+bash scripts/setup-android-node.sh 105.225.132.175
 # then edit rpcpassword in ~/.ega/ega.conf
 ```
 
@@ -172,7 +172,7 @@ Heat and battery will rise — use while charging.
 Shared pool from phone (when you have a miner app that speaks stratum):
 
 ```
-stratum+tcp://105.225.100.58:3335
+stratum+tcp://105.225.132.175:3335
 user = your E… address
 pass = x
 ```
@@ -186,7 +186,7 @@ pass = x
 | Device | Role |
 |--------|------|
 | Home PC | Public seed, port **20201** forwarded |
-| Android | Node with `addnode=105.225.100.58:20201` |
+| Android | Node with `addnode=105.225.132.175:20201` |
 
 On home PC check:
 
@@ -212,8 +212,8 @@ When the phone is online and connected, this can become **1+** without a VPS.
 
 ## Links
 
-- Seed: `105.225.100.58:20201`  
-- Pool UI: http://105.225.100.58:8089/ (if port forwarded)  
-- Explorer: http://105.225.100.58:8088/  
+- Seed: `105.225.132.175:20201`  
+- Pool UI: http://105.225.132.175:8089/ (if port forwarded)  
+- Explorer: http://105.225.132.175:8088/  
 - Site: https://egalitarianism-ega.github.io/ega-website/  
 - Repo: https://github.com/Egalitarianism-EGA/ega  

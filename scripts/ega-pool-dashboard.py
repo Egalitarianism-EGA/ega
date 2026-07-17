@@ -19,7 +19,7 @@ PORT = int(os.environ.get("EGA_POOL_UI_PORT", "8089"))
 API_BASE = os.environ.get("EGA_POOL_API_BASE", "http://127.0.0.1:4000").rstrip("/")
 STRATUM_STATS = os.environ.get("EGA_STRATUM_STATS", "http://127.0.0.1:3337").rstrip("/")
 RPC_URL = os.environ.get("EGA_RPC_URL", "http://127.0.0.1:20202")
-PUBLIC = os.environ.get("EGA_PUBLIC_HOST", "105.225.100.58")
+PUBLIC = os.environ.get("EGA_PUBLIC_HOST", "105.225.132.175")
 EXPLORER = os.environ.get("EGA_EXPLORER_URL", f"http://{PUBLIC}:8088")
 WALLET_WEB = os.environ.get("EGA_WALLET_URL", f"http://{PUBLIC}:8090")
 

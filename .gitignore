@@ -137,3 +137,5 @@ src/crypto/randomx/build/
 *.pem
 *github_pat*
 configure~
+.aider*
+src/ega-pow-hash

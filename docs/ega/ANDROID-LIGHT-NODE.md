@@ -68,7 +68,7 @@ rpcport=20202
 port=20201
 
 # Community seed (operator home — update if IP changes)
-addnode=105.225.100.58:20201
+addnode=105.225.132.175:20201
 
 algo=yespower-ega
 EOF
@@ -113,7 +113,7 @@ Shared pool on phone: when RandomX/Yespower stratum is live, point a mobile mine
 Until VPS money:
 
 1. Home PC = primary seed (port 20201 forwarded).  
-2. Android on Wi‑Fi = second node with `addnode=105.225.100.58:20201` **and** home has `addnode=<phone LAN IP>:20201` if reachable.  
+2. Android on Wi‑Fi = second node with `addnode=105.225.132.175:20201` **and** home has `addnode=<phone LAN IP>:20201` if reachable.  
 3. Result: `getconnectioncount` ≥ 1 with **$0**.
 
 If the phone is only on mobile data, inbound peers are hard (CGNAT). Outbound `addnode` to home still helps **you** sync and mine; inbound seed role needs a reachable address (home PC is better for that).

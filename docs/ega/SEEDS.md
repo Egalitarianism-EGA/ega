@@ -4,11 +4,11 @@
 
 | Service | Endpoint | Notes |
 |---------|----------|-------|
-| P2P | `105.225.100.58:20201` | Home PC — port-forward if public |
-| Explorer | `http://105.225.100.58:8088/` | TCP **8088** |
-| Pool Verthash | `stratum+tcp://105.225.100.58:3334` | GPU share-verify |
-| Pool Scrypt | `stratum+tcp://105.225.100.58:3336` | share-verify |
-| Pool API | `http://105.225.100.58:4000/api/pools` | optional |
+| P2P | `105.225.132.175:20201` | Home PC — port-forward if public |
+| Explorer | `http://105.225.132.175:8088/` | TCP **8088** |
+| Pool Verthash | `stratum+tcp://105.225.132.175:3334` | GPU share-verify |
+| Pool Scrypt | `stratum+tcp://105.225.132.175:3336` | share-verify |
+| Pool API | `http://105.225.132.175:4000/api/pools` | optional |
 
 **RandomX / YespowerEGA:** solo only (`easy-mine` / `low-power-mine`) — not stock Miningcore.
 
