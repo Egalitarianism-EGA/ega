@@ -116,7 +116,7 @@ DONE:
 
 NOT DONE / NEXT:
   [x] New GitHub Release binary after MultiShield-4 (v0.2.0)
-  [~] Seed IP published (early): 105.225.100.58:20201 — confirm port-forward
+  [~] Seed IP published (early): 105.225.132.175:20201 — confirm port-forward
   [x] Public explorer quick tunnel (ephemeral Cloudflare URL — see SEEDS.md)
   [ ] Miningcore RandomX/Yespower/Scrypt full share-verify (or stock scrypt pool profile live)
   [ ] Windows / macOS packages
